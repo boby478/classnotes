@@ -2793,9 +2793,9 @@ async function processTranscript(){
         /* Q CARDS */
 
         currentFlashcards =
-            Array.isArray(data.flashcards)
-                ? data.flashcards
-                : [];
+            Array.isArray(data.q_cards)
+                ? data.q_cards
+                : (Array.isArray(data.flashcards) ? data.flashcards : []);
 
         currentCardIndex = 0;
 
@@ -2818,7 +2818,8 @@ async function processTranscript(){
             questions: data.questions || [],
             things_to_remember: data.things_to_remember || [],
             exam_points: data.exam_points || [],
-            flashcards: currentFlashcards
+            flashcards: currentFlashcards,
+            q_cards: currentFlashcards
         };
 
         saveLesson(currentLessonData);
@@ -3118,7 +3119,14 @@ function loadLesson(id){
 
         const li = document.createElement("li");
 
-        li.textContent = t;
+        if(typeof t === "object" && t !== null){
+            li.textContent =
+                t.term
+                    ? t.term + (t.definition ? " — " + t.definition : "")
+                    : JSON.stringify(t);
+        }else{
+            li.textContent = t;
+        }
 
         terms.appendChild(li);
 
@@ -3160,7 +3168,7 @@ function loadLesson(id){
 
     });
 
-    currentFlashcards = lesson.flashcards || [];
+    currentFlashcards = lesson.q_cards || lesson.flashcards || [];
 
     currentCardIndex = 0;
 
