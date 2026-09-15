@@ -10,9 +10,10 @@ from flask import Flask, request, jsonify, send_from_directory
 app = Flask(__name__, static_folder="../frontend", static_url_path="")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+LOGFARE_API_KEY = os.environ.get("LOGFARE_API_KEY", "")
 
 TRANSCRIBE_MODEL = "gemini-3.5-transcribe"
-STUDY_MODEL = "gemini-3.8-flash"
+STUDY_MODEL = "gemma-4-26b"
 
 
 def gemini_request(model, payload):
@@ -176,17 +177,29 @@ def transcribe_audio(file_bytes, mime_type, filename):
 
 
 def study_pack(text):
+    if not LOGFARE_API_KEY:
+        raise RuntimeError("LOGFARE_API_KEY is not configured on Render.")
+
     prompt = f"""
 You are ClassNotes, an AI classroom study assistant.
 
-Turn the following classroom transcript into a useful study pack.
+Turn the classroom transcript below into a high-quality study pack.
 
-Use ONLY information contained in the transcript.
-Do not invent facts.
-Remove repetition and filler.
-Correct obvious speech-recognition mistakes when the intended meaning is clear.
+IMPORTANT:
+- Use ONLY information contained in the transcript.
+- Do not invent facts.
+- Remove repetition, filler and irrelevant conversation.
+- Correct obvious speech-recognition mistakes when the intended meaning is clear.
+- Keep the notes suitable for a school student.
+- Prioritize information that would actually help the student study and prepare for tests.
+- Keep the output concise but useful.
+- Return ONLY valid JSON.
+- Do NOT return markdown.
+- Do NOT return code fences.
+- Do NOT return explanations outside the JSON.
+- Important terms MUST contain both a term and a definition.
 
-Return ONLY valid JSON with EXACTLY this structure:
+Return EXACTLY this structure:
 
 {{
   "title": "",
@@ -210,44 +223,70 @@ Return ONLY valid JSON with EXACTLY this structure:
 }}
 
 Requirements:
-
 - title: short lesson title
-- summary: concise but useful explanation
-- key_points: important facts and ideas
-- important_terms: important vocabulary with short definitions
-- questions: useful revision questions
-- things_to_remember: memorable facts or concepts
-- exam_points: material likely to matter in an assessment
-- q_cards: useful flashcards covering the important material
-- Keep answers accurate and reasonably short.
+- summary: concise explanation of the whole lesson
+- key_points: the most important facts and ideas
+- important_terms: important vocabulary WITH short accurate definitions
+- questions: useful revision questions based only on the lesson
+- things_to_remember: especially memorable facts, rules or concepts
+- exam_points: material especially likely to matter in an assessment
+- q_cards: useful question-and-answer flashcards
+- Avoid duplicates.
+- Do not add information that was not taught.
 
 TRANSCRIPT:
-
 {text}
 """
 
     payload = {
-        "contents": [
+        "model": STUDY_MODEL,
+        "messages": [
             {
-                "parts": [
-                    {
-                        "text": prompt
-                    }
-                ]
+                "role": "system",
+                "content": (
+                    "You are ClassNotes. "
+                    "Return ONLY the requested final JSON. "
+                    "Do not include reasoning, analysis, commentary, "
+                    "markdown fences, or explanations outside the JSON."
+                )
+            },
+            {
+                "role": "user",
+                "content": prompt
             }
         ],
-        "generationConfig": {
-            "temperature": 0.2,
-            "responseMimeType": "application/json"
-        }
+        "temperature": 0.2,
+        "max_tokens": 4000
     }
 
-    result = gemini_request(
-        STUDY_MODEL,
-        payload
+    req = urllib.request.Request(
+        "https://logfare.ai/v1/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {LOGFARE_API_KEY}",
+        },
+        method="POST",
     )
 
-    data = parse_json(extract_text(result))
+    try:
+        with urllib.request.urlopen(req, timeout=300) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"Logfare HTTP {e.code}: {body[:3000]}"
+        )
+
+    try:
+        content = result["choices"][0]["message"]["content"]
+    except Exception:
+        raise RuntimeError(
+            "Logfare returned an unexpected response: "
+            + json.dumps(result)[:3000]
+        )
+
+    data = parse_json(content)
 
     data.setdefault("title", "Class notes")
     data.setdefault("summary", "")
@@ -260,7 +299,6 @@ TRANSCRIPT:
 
     return data
 
-
 @app.route("/")
 def home():
     return send_from_directory("../frontend", "index.html")
@@ -271,7 +309,7 @@ def health():
     return jsonify({
         "ok": True,
         "service": "ClassNotes",
-        "ai": "configured" if GEMINI_API_KEY else "not_configured",
+        "ai": "configured" if (GEMINI_API_KEY or LOGFARE_API_KEY) else "not_configured",
         "transcription_model": TRANSCRIBE_MODEL,
         "study_model": STUDY_MODEL
     })
@@ -281,7 +319,7 @@ def health():
 def transcribe():
     if not GEMINI_API_KEY:
         return jsonify({
-            "error": "GEMINI_API_KEY is not configured on Render."
+            "error": "LOGFARE_API_KEY is not configured on Render."
         }), 503
 
     if "audio" not in request.files:
@@ -325,7 +363,7 @@ def transcribe():
 
 @app.route("/study-pack", methods=["POST"])
 def create_study_pack():
-    if not GEMINI_API_KEY:
+    if not LOGFARE_API_KEY:
         return jsonify({
             "error": "GEMINI_API_KEY is not configured on Render."
         }), 503
