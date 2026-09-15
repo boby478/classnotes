@@ -74,8 +74,8 @@ body{
    Fixed behind everything so every
    glass surface reveals the same
    scene underneath it.
-
 ================================= */
+
 .bg-photo{
     position:fixed;
     inset:0;
@@ -116,8 +116,8 @@ button{
    blurred, saturated. Matte
    surfaces sit inside glass shells
    to hold focus without competing.
-
 ================================= */
+
 .glass{
     position:relative;
 
@@ -201,8 +201,8 @@ button{
 
 /* =================================
    HEADER
-
 ================================= */
+
 header{
     min-height:68px;
 
@@ -310,8 +310,8 @@ header{
 
 /* =================================
    MAIN GRID
-
 ================================= */
+
 .grid{
     display:grid;
 
@@ -351,8 +351,8 @@ header{
 
 /* =================================
    MICROPHONE AREA
-
 ================================= */
+
 .mic-area{
     min-height:440px;
 
@@ -529,8 +529,8 @@ header{
    GENERATE BUTTON
    Solid, matte, high-contrast —
    the one bold accent in the frame.
-
 ================================= */
+
 .generate{
     margin-top:24px;
 
@@ -592,8 +592,8 @@ header{
 
 /* =================================
    TABS
-
 ================================= */
+
 .tabs{
     display:flex;
 
@@ -652,8 +652,8 @@ header{
 
 /* =================================
    PANELS
-
 ================================= */
+
 .panel{
     display:none;
 
@@ -669,8 +669,8 @@ header{
    TRANSCRIPT
    Matte, recessed — a quiet
    reading surface, not glass.
-
 ================================= */
+
 .transcript{
     min-height:284px;
 
@@ -721,8 +721,8 @@ header{
 
 /* =================================
    STATS
-
 ================================= */
+
 .stats{
     display:flex;
 
@@ -740,8 +740,8 @@ header{
 
 /* =================================
    NOTES
-
 ================================= */
+
 .summary h2{
     font-size:19px;
 
@@ -858,8 +858,8 @@ header{
 
 /* =================================
    Q CARDS
-
 ================================= */
+
 .qcards-empty,
 .saved-empty{
     color:var(--ink-faint);
@@ -1006,8 +1006,8 @@ header{
 
 /* =================================
    SEARCH + SAVED CLASSES
-
 ================================= */
+
 .search-bar{
     width:100%;
 
@@ -1103,8 +1103,8 @@ header{
 
 /* =================================
    LOADING / ERROR
-
 ================================= */
+
 .loading{
     color:var(--blue) !important;
 }
@@ -1116,8 +1116,8 @@ header{
 
 /* =================================
    ANIMATIONS
-
 ================================= */
+
 @keyframes micPulse{
 
     0%,100%{
@@ -1185,8 +1185,8 @@ header{
 
 /* =================================
    ACCESSIBILITY
-
 ================================= */
+
 @media(prefers-reduced-motion:reduce){
 
     .status-dot.listening,
@@ -1213,8 +1213,8 @@ button:focus-visible,
 
 /* =================================
    MOBILE
-
 ================================= */
+
 @media(max-width:760px){
 
     body{
@@ -1695,16 +1695,16 @@ button:focus-visible,
 
 /* =================================
    BACKEND
-
 ================================= */
+
 const BACKEND =
     "https://classnotes-i4nn.onrender.com";
 
 
 /* =================================
    STATE
-
 ================================= */
+
 let recognition = null;
 
 let listening = false;
@@ -1720,8 +1720,8 @@ let interimTranscript = "";
 
 /* =================================
    ELEMENTS
-
 ================================= */
+
 const micButton =
     document.getElementById("micButton");
 
@@ -1817,8 +1817,8 @@ const SAVED_KEY = "classnotes_saved_lessons";
 
 /* =================================
    TABS
-
 ================================= */
+
 document
 .querySelectorAll(".tab")
 .forEach(button => {
@@ -1858,8 +1858,8 @@ document
 
 /* =================================
    BACKEND CHECK
-
 ================================= */
+
 async function checkBackend(){
 
     try{
@@ -1900,302 +1900,314 @@ checkBackend();
 
 
 /* =================================
-   AUDIO RECORDING ENGINE
-
+   SPEECH
 ================================= */
-let mediaRecorder = null;
-let audioChunks = [];
-let audioStream = null;
+
+const SpeechRecognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
 
 
-/* =================================
-   MICROPHONE BUTTON
+if(SpeechRecognition){
 
-================================= */
-if(!micButton){
-
-    console.error("ClassNotes: micButton was not found.");
+    createRecognition();
 
 }else{
 
-    console.log(
-        "ClassNotes: microphone button connected."
-    );
-
-    micButton.onclick = async function(event){
-
-        event.preventDefault();
-        event.stopPropagation();
-
-        console.log(
-            "ClassNotes: microphone button clicked."
-        );
-
-        if(listening){
-
-            stopListening();
-
-        }else{
-
-            startListening();
-
-        }
-
-    };
+    micSub.textContent =
+        "Speech recognition is not supported. Try Chrome.";
 
 }
 
 
 /* =================================
-   START RECORDING
-
+   CREATE RECOGNITION
 ================================= */
-async function startListening(){
 
-    console.log(
-        "ClassNotes: requesting microphone."
-    );
+function createRecognition(){
 
-    if(!navigator.mediaDevices){
-
-        throw new Error(
-            "This browser does not provide microphone access. Open ClassNotes in Chrome."
-        );
-
-    }
-
-    if(!navigator.mediaDevices.getUserMedia){
-
-        throw new Error(
-            "Microphone recording is not supported by this browser."
-        );
-
-    }
-
-    if(!window.MediaRecorder){
-
-        throw new Error(
-            "Audio recording is not supported by this browser."
-        );
-
-    }
+    recognition =
+        new SpeechRecognition();
 
 
-    audioStream =
-        await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-            }
-        });
+    recognition.continuous =
+        true;
 
 
-    audioChunks = [];
+    recognition.interimResults =
+        true;
 
 
-    let mimeType = "";
-
-    const types = [
-        "audio/webm;codecs=opus",
-        "audio/webm",
-        "audio/mp4"
-    ];
+    recognition.maxAlternatives =
+        1;
 
 
-    for(const type of types){
-
-        if(
-            MediaRecorder.isTypeSupported &&
-            MediaRecorder.isTypeSupported(type)
-        ){
-
-            mimeType = type;
-            break;
-
-        }
-
-    }
+    recognition.lang =
+        "en-ZA";
 
 
-    mediaRecorder =
-        mimeType
-            ? new MediaRecorder(
-                audioStream,
-                {mimeType}
-              )
-            : new MediaRecorder(
-                audioStream
-              );
+    recognition.onstart =
+        () => {
+
+            restarting = false;
 
 
-    mediaRecorder.ondataavailable =
-        function(event){
-
-            if(
-                event.data &&
-                event.data.size > 0
-            ){
-
-                audioChunks.push(
-                    event.data
-                );
-
-            }
-
-        };
+            if(!listening)
+                return;
 
 
-    mediaRecorder.onstart =
-        function(){
+            statusDot
+                .classList
+                .add("listening");
 
-            listening = true;
-            processing = false;
 
-            statusDot.classList.add(
-                "listening"
-            );
+            statusDot
+                .classList
+                .remove("processing");
 
-            statusDot.classList.remove(
-                "processing"
-            );
 
             statusText.textContent =
                 "Listening";
 
-            micButton.classList.add(
-                "listening"
-            );
+
+            micButton
+                .classList
+                .add("listening");
+
 
             micLabel.textContent =
                 "Listening…";
 
+
             micSub.textContent =
-                "Recording your class";
-
-            transcriptText.innerHTML =
-                '<span class="transcript-placeholder">' +
-                'Listening to your class…' +
-                '</span>';
-
-            wordCount.textContent =
-                "Recording";
-
-            generateButton.disabled = true;
+                "Listening continuously";
 
         };
 
 
-    mediaRecorder.onerror =
-        function(event){
+    recognition.onresult =
+        event => {
 
-            console.error(
-                "ClassNotes recorder error:",
-                event
-            );
-
-            showMicError(
-                "The browser could not start recording."
-            );
-
-        };
+            interimTranscript = "";
 
 
-    mediaRecorder.onstop =
-        async function(){
+            for(
+                let i = event.resultIndex;
+                i < event.results.length;
+                i++
+            ){
 
-            console.log(
-                "ClassNotes: recording stopped."
-            );
+                const result =
+                    event.results[i];
 
-            if(audioStream){
 
-                audioStream
-                    .getTracks()
-                    .forEach(
-                        track => track.stop()
-                    );
+                const text =
+                    result[0]
+                    .transcript
+                    .trim();
 
-                audioStream = null;
+
+                if(!text)
+                    continue;
+
+
+                if(result.isFinal){
+
+                    addFinalChunk(text);
+
+                }else{
+
+                    interimTranscript +=
+                        text + " ";
+
+                }
 
             }
 
 
-            listening = false;
+            updateTranscript();
 
-            micButton.classList.remove(
-                "listening"
+        };
+
+
+    recognition.onend =
+        () => {
+
+            console.log(
+                "Recognition ended"
             );
 
-            statusDot.classList.remove(
-                "listening"
-            );
 
-            statusDot.classList.add(
-                "processing"
-            );
+            if(
+                listening &&
+                !processing
+            ){
 
-            statusText.textContent =
-                "Transcribing";
-
-            micLabel.textContent =
-                "Transcribing…";
-
-            micSub.textContent =
-                "Turning your recording into text";
+                if(restarting)
+                    return;
 
 
-            const blob =
-                new Blob(
-                    audioChunks,
-                    {
-                        type:
-                            mediaRecorder.mimeType ||
-                            "audio/webm"
-                    }
+                restarting = true;
+
+
+                setTimeout(
+                    () => {
+
+                        if(
+                            !listening ||
+                            processing
+                        ){
+
+                            restarting =
+                                false;
+
+                            return;
+
+                        }
+
+
+                        createRecognition();
+
+
+                        try{
+
+                            recognition.start();
+
+                        }catch(error){
+
+                            console.log(
+                                error
+                            );
+
+                        }
+
+                    },
+                    300
                 );
 
-
-            if(!blob.size){
-
-                showMicError(
-                    "The recording was empty."
-                );
 
                 return;
 
             }
 
 
-            await transcribeRecording(
-                blob
-            );
+            if(processing){
+
+                processTranscript();
+
+            }
 
         };
 
 
-    mediaRecorder.start(1000);
+    recognition.onerror =
+        event => {
 
-    console.log(
-        "ClassNotes: recording started."
-    );
+            console.log(
+                "Speech error:",
+                event.error
+            );
+
+
+            if(
+                event.error ===
+                "not-allowed"
+            ){
+
+                listening =
+                    false;
+
+
+                micButton
+                    .classList
+                    .remove("listening");
+
+
+                statusDot
+                    .classList
+                    .remove("listening");
+
+
+                statusText.textContent =
+                    "Microphone blocked";
+
+
+                micLabel.textContent =
+                    "Microphone blocked";
+
+
+                micSub.textContent =
+                    "Allow microphone access in Chrome";
+
+            }
+
+        };
 
 }
 
 
 /* =================================
-   STOP RECORDING
-
+   SMART TRANSCRIPT MERGING
 ================================= */
-function stopListening(){
 
-    console.log(
-        "ClassNotes: stopping microphone."
-    );
+function normalizeWords(text){
+
+    return text
+        .toLowerCase()
+        .replace(
+            /[^\p{L}\p{N}\s]/gu,
+            ""
+        )
+        .split(/\s+/)
+        .filter(Boolean);
+
+}
+
+
+function addFinalChunk(chunk){
+
+    chunk =
+        chunk.trim();
+
+
+    if(!chunk)
+        return;
+
+
+    const oldWords =
+        normalizeWords(
+            finalTranscript
+        );
+
+
+    const newWords =
+        normalizeWords(
+            chunk
+        );
+
+
+    if(!newWords.length)
+        return;
+
+
+    /*
+       Exact duplicate chunk.
+    */
+
+    const oldTail =
+        oldWords.slice(
+            -newWords.length
+        );
+
 
     if(
-        !mediaRecorder ||
-        mediaRecorder.state === "inactive"
+        oldTail.length ===
+        newWords.length &&
+        oldTail.every(
+            (word,index) =>
+                word ===
+                newWords[index]
+        )
     ){
 
         return;
@@ -2203,214 +2215,76 @@ function stopListening(){
     }
 
 
-    processing = true;
+    /*
+       Detect overlapping words.
+    */
 
-    statusDot.classList.remove(
-        "listening"
-    );
-
-    statusDot.classList.add(
-        "processing"
-    );
-
-    statusText.textContent =
-        "Finishing recording";
-
-    micLabel.textContent =
-        "Finishing…";
-
-    micSub.textContent =
-        "Preparing your transcript";
+    let overlap = 0;
 
 
-    mediaRecorder.stop();
-
-}
-
-
-/* =================================
-   MICROPHONE ERROR
-
-================================= */
-function showMicError(message){
-
-    listening = false;
-    processing = false;
+    const maxOverlap =
+        Math.min(
+            oldWords.length,
+            newWords.length
+        );
 
 
-    if(audioStream){
+    for(
+        let size = maxOverlap;
+        size >= 1;
+        size--
+    ){
 
-        audioStream
-            .getTracks()
-            .forEach(
-                track => track.stop()
-            );
+        const a =
+            oldWords.slice(-size);
 
-        audioStream = null;
+
+        const b =
+            newWords.slice(0,size);
+
+
+        if(
+            a.length === b.length &&
+            a.every(
+                (word,index) =>
+                    word === b[index]
+            )
+        ){
+
+            overlap =
+                size;
+
+            break;
+
+        }
 
     }
 
 
-    statusDot.classList.remove(
-        "listening"
-    );
-
-    statusDot.classList.remove(
-        "processing"
-    );
-
-
-    statusText.textContent =
-        "Microphone error";
-
-    micButton.classList.remove(
-        "listening"
-    );
-
-    micLabel.textContent =
-        "Start listening";
-
-    micSub.textContent =
-        message;
-
-
-    console.error(
-        "ClassNotes microphone:",
-        message
-    );
-
-
-    alert(
-        "ClassNotes microphone\\n\\n" +
-        message
-    );
-
-}
-
-
-/* =================================
-   TRANSCRIBE RECORDING
-
-================================= */
-
-
-async function transcribeRecording(audioBlob){
-
-    try{
-
-        const formData =
-            new FormData();
-
-        const extension =
-            audioBlob.type.includes("mp4")
-                ? "m4a"
-                : "webm";
-
-        formData.append(
-            "audio",
-            audioBlob,
-            "class-recording." + extension
+    const wordsToAdd =
+        newWords.slice(
+            overlap
         );
 
 
-        const response =
-            await fetch(
-                BACKEND + "/transcribe",
-                {
-                    method: "POST",
-                    body: formData
-                }
-            );
+    if(!wordsToAdd.length)
+        return;
 
 
-        const raw =
-            await response.text();
-
-
-        if(!response.ok){
-
-            throw new Error(
-                "Transcription HTTP " +
-                response.status +
-                ": " +
-                raw
-            );
-
-        }
-
-
-        const data =
-            JSON.parse(raw);
-
-
-        finalTranscript =
-            (data.transcript || "").trim();
-
-
-        interimTranscript = "";
-
-
-        updateTranscript();
-
-
-        if(!finalTranscript){
-
-            throw new Error(
-                "No speech was detected."
-            );
-
-        }
-
-
-        statusDot.classList.remove("processing");
-
-        statusText.textContent =
-            "Transcript ready";
-
-        micLabel.textContent =
-            "Create notes";
-
-        micSub.textContent =
-            "Your transcript is ready";
-
-        generateButton.disabled =
-            false;
-
-
-    }catch(error){
-
-        console.error(
-            "Transcription error:",
-            error
-        );
-
-        statusDot.classList.remove("processing");
-
-        statusText.textContent =
-            "Transcription failed";
-
-        micLabel.textContent =
-            "Start listening";
-
-        micSub.textContent =
-            "Your recording could not be transcribed";
-
-        transcriptText.textContent =
-            "Couldn't transcribe recording: " +
-            error.message;
-
-        generateButton.disabled =
-            true;
-
-    }
+    finalTranscript =
+        (
+            finalTranscript.trim() +
+            " " +
+            wordsToAdd.join(" ")
+        ).trim() + " ";
 
 }
 
 
 /* =================================
    UPDATE TRANSCRIPT
-
 ================================= */
+
 function updateTranscript(){
 
     const combined =
@@ -2424,7 +2298,7 @@ function updateTranscript(){
 
         transcriptText.innerHTML =
             '<span class="transcript-placeholder">' +
-            'Your transcript will appear here…' +
+            'Listening for speech…' +
             '</span>';
 
     }else{
@@ -2437,17 +2311,17 @@ function updateTranscript(){
 
     const words =
         combined
-            .split(/\s+/)
-            .filter(Boolean)
-            .length;
+        .split(/\s+/)
+        .filter(Boolean)
+        .length;
 
 
     wordCount.textContent =
         words +
         (
             words === 1
-                ? " word"
-                : " words"
+            ? " word"
+            : " words"
         );
 
 
@@ -2462,36 +2336,183 @@ function updateTranscript(){
 
 
 /* =================================
-   GENERATE NOTES
-
+   START / STOP
 ================================= */
+
+micButton.addEventListener(
+    "click",
+    () => {
+
+        if(!recognition){
+
+            alert(
+                "Speech recognition is not supported. Try Chrome."
+            );
+
+            return;
+
+        }
+
+
+        if(listening){
+
+            stopListening();
+
+        }else{
+
+            startListening();
+
+        }
+
+    }
+);
+
+
+function startListening(){
+
+    finalTranscript = "";
+
+    interimTranscript = "";
+
+    restarting = false;
+
+    processing = false;
+
+    listening = true;
+
+
+    transcriptText.innerHTML =
+        '<span class="transcript-placeholder">' +
+        'Listening for speech…' +
+        '</span>';
+
+
+    try{
+
+        recognition.start();
+
+    }catch(error){
+
+        console.log(error);
+
+    }
+
+}
+
+
+function stopListening(){
+
+    listening = false;
+
+    processing = true;
+
+    restarting = false;
+
+
+    micButton
+        .classList
+        .remove("listening");
+
+
+    statusDot
+        .classList
+        .remove("listening");
+
+
+    statusDot
+        .classList
+        .add("processing");
+
+
+    statusText.textContent =
+        "Finishing transcript";
+
+
+    micLabel.textContent =
+        "Finishing…";
+
+
+    micSub.textContent =
+        "Preparing your notes";
+
+
+    try{
+
+        recognition.stop();
+
+    }catch(error){
+
+        processTranscript();
+
+    }
+
+}
+
+
+/* =================================
+   GENERATE NOTES
+================================= */
+
 async function processTranscript(){
+
+    processing = false;
+
 
     const text =
         finalTranscript.trim();
 
 
+    interimTranscript = "";
+
+
+    updateTranscript();
+
+
     if(!text){
+
+        statusDot
+            .classList
+            .remove("processing");
+
+
+        statusText.textContent =
+            "Ready";
+
+
+        micLabel.textContent =
+            "Start listening";
+
+
+        micSub.textContent =
+            "No speech was detected";
+
 
         return;
 
     }
 
 
-    statusDot.classList.add("processing");
-
     statusText.textContent =
         "AI processing";
+
 
     micLabel.textContent =
         "Creating notes…";
 
+
     micSub.textContent =
-        "Building your study pack";
+        "AI is analyzing your class";
 
 
-    summaryText.classList.remove("error");
-    summaryText.classList.add("loading");
+    summaryText
+        .classList
+        .remove("error");
+
+
+    summaryText
+        .classList
+        .add("loading");
+
 
     summaryText.textContent =
         "Generating your class notes…";
@@ -2515,35 +2536,23 @@ async function processTranscript(){
         "</li>";
 
 
-    remember.innerHTML =
-        "<li class='loading'>" +
-        "Finding things to remember…" +
-        "</li>";
-
-
-    exampoints.innerHTML =
-        "<li class='loading'>" +
-        "Finding exam material…" +
-        "</li>";
-
-
     try{
 
         const response =
             await fetch(
-                BACKEND + "/study-pack",
+                BACKEND +
+                "/summarize",
                 {
-                    method: "POST",
+                    method:"POST",
 
                     headers:{
                         "Content-Type":
                             "application/json"
                     },
 
-                    body:
-                        JSON.stringify({
-                            text: text
-                        })
+                    body:JSON.stringify({
+                        text:text
+                    })
                 }
             );
 
@@ -2569,177 +2578,258 @@ async function processTranscript(){
 
 
         console.log(
-            "ClassNotes study pack:",
+            "ClassNotes AI:",
             data
         );
 
 
-        summaryText.classList.remove("loading");
+        /* SUMMARY */
+
+        summaryText
+            .classList
+            .remove("loading");
+
 
         summaryText.textContent =
             data.summary ||
             "No summary returned.";
 
 
+        /* KEY POINTS */
+
         keypoints.innerHTML = "";
 
-        (data.key_points || [])
+
+        if(
+            Array.isArray(
+                data.key_points
+            )
+        ){
+
+            data.key_points
             .forEach(point => {
 
                 const li =
-                    document.createElement("li");
+                    document.createElement(
+                        "li"
+                    );
 
-                li.textContent = point;
+                li.textContent =
+                    point;
 
-                keypoints.appendChild(li);
+                keypoints.appendChild(
+                    li
+                );
 
             });
 
+        }else{
+
+            keypoints.innerHTML =
+                "<li>" +
+                (
+                    data.key_points ||
+                    "No key points returned."
+                ) +
+                "</li>";
+
+        }
+
+
+        /* TERMS */
 
         terms.innerHTML = "";
 
-        (data.important_terms || [])
+
+        if(
+            Array.isArray(
+                data.important_terms
+            )
+        ){
+
+            data.important_terms
             .forEach(term => {
 
                 const li =
-                    document.createElement("li");
+                    document.createElement(
+                        "li"
+                    );
 
-                if(
-                    typeof term === "object" &&
-                    term !== null
-                ){
+                li.textContent =
+                    term;
 
-                    li.textContent =
-                        term.term +
-                        (
-                            term.definition
-                                ? " — " +
-                                  term.definition
-                                : ""
-                        );
-
-                }else{
-
-                    li.textContent = term;
-
-                }
-
-                terms.appendChild(li);
+                terms.appendChild(
+                    li
+                );
 
             });
 
+        }else{
+
+            terms.innerHTML =
+                "<li>" +
+                (
+                    data.important_terms ||
+                    "No important terms returned."
+                ) +
+                "</li>";
+
+        }
+
+
+        /* QUESTIONS */
 
         questions.innerHTML = "";
 
-        (data.questions || [])
+
+        if(
+            Array.isArray(
+                data.questions
+            )
+        ){
+
+            data.questions
             .forEach(question => {
 
                 const li =
-                    document.createElement("li");
+                    document.createElement(
+                        "li"
+                    );
 
-                li.textContent = question;
+                li.textContent =
+                    question;
 
-                questions.appendChild(li);
+                questions.appendChild(
+                    li
+                );
 
             });
 
+        }else{
+
+            questions.innerHTML =
+                "<li>" +
+                (
+                    data.questions ||
+                    "No questions returned."
+                ) +
+                "</li>";
+
+        }
+
+
+        /* THINGS TO REMEMBER */
 
         remember.innerHTML = "";
 
-        (data.things_to_remember || [])
+        if(
+            Array.isArray(
+                data.things_to_remember
+            )
+        ){
+
+            data.things_to_remember
             .forEach(item => {
 
                 const li =
                     document.createElement("li");
 
-                li.textContent = item;
+                li.textContent =
+                    item;
 
                 remember.appendChild(li);
 
             });
 
+        }else{
+
+            remember.innerHTML =
+                "<li>" +
+                (
+                    data.things_to_remember ||
+                    "Nothing flagged."
+                ) +
+                "</li>";
+
+        }
+
+
+        /* EXAM POINTS */
 
         exampoints.innerHTML = "";
 
-        (data.exam_points || [])
+        if(
+            Array.isArray(
+                data.exam_points
+            )
+        ){
+
+            data.exam_points
             .forEach(item => {
 
                 const li =
                     document.createElement("li");
 
-                li.textContent = item;
+                li.textContent =
+                    item;
 
                 exampoints.appendChild(li);
 
             });
 
+        }else{
+
+            exampoints.innerHTML =
+                "<li>" +
+                (
+                    data.exam_points ||
+                    "Nothing flagged."
+                ) +
+                "</li>";
+
+        }
+
+
+        /* Q CARDS */
 
         currentFlashcards =
             Array.isArray(data.q_cards)
                 ? data.q_cards
-                : [];
-
+                : Array.isArray(data.flashcards)
+                    ? data.flashcards
+                    : [];
 
         currentCardIndex = 0;
 
         renderFlashcard();
 
 
+        /* SAVE TO LIBRARY */
+
         currentLessonData = {
-
             id: Date.now(),
-
-            title:
-                data.title ||
-                makeLessonTitle(data.summary),
-
-            date:
-                new Date().toLocaleDateString(
-                    "en-GB",
-                    {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric"
-                    }
-                ),
-
+            title: makeLessonTitle(data.summary),
+            date: new Date().toLocaleDateString(
+                "en-GB",
+                { day:"numeric", month:"long", year:"numeric" }
+            ),
             transcript: text,
-
-            summary:
-                data.summary || "",
-
-            key_points:
-                data.key_points || [],
-
-            important_terms:
-                data.important_terms || [],
-
-            questions:
-                data.questions || [],
-
-            things_to_remember:
-                data.things_to_remember || [],
-
-            exam_points:
-                data.exam_points || [],
-
-            flashcards:
-                currentFlashcards,
-
-            q_cards:
-                currentFlashcards
-
+            summary: data.summary || "",
+            key_points: data.key_points || [],
+            important_terms: data.important_terms || [],
+            questions: data.questions || [],
+            things_to_remember: data.things_to_remember || [],
+            exam_points: data.exam_points || [],
+            q_cards: currentFlashcards,
+            flashcards: currentFlashcards
         };
 
-
-        saveLesson(
-            currentLessonData
-        );
+        saveLesson(currentLessonData);
 
 
-        statusDot.classList.remove(
-            "processing"
-        );
+        statusDot
+            .classList
+            .remove("processing");
 
 
         statusText.textContent =
@@ -2753,6 +2843,10 @@ async function processTranscript(){
         micSub.textContent =
             "Your class notes are ready";
 
+
+        /*
+           Open Notes automatically.
+        */
 
         document
             .querySelector(
@@ -2769,13 +2863,14 @@ async function processTranscript(){
         );
 
 
-        summaryText.classList.remove(
-            "loading"
-        );
+        summaryText
+            .classList
+            .remove("loading");
 
-        summaryText.classList.add(
-            "error"
-        );
+
+        summaryText
+            .classList
+            .add("error");
 
 
         summaryText.textContent =
@@ -2801,9 +2896,9 @@ async function processTranscript(){
             "</li>";
 
 
-        statusDot.classList.remove(
-            "processing"
-        );
+        statusDot
+            .classList
+            .remove("processing");
 
 
         statusText.textContent =
@@ -2824,9 +2919,7 @@ async function processTranscript(){
 
 /* =================================
    MANUAL GENERATE
-
 ================================= */
-
 
 generateButton.addEventListener(
     "click",
@@ -2846,8 +2939,8 @@ generateButton.addEventListener(
 
 /* =================================
    Q CARDS — render / navigate / flip
-
 ================================= */
+
 function renderFlashcard(){
 
     if(!currentFlashcards.length){
@@ -2926,8 +3019,8 @@ qcardNext.addEventListener(
 
 /* =================================
    LESSON TITLE HEURISTIC
-
 ================================= */
+
 function makeLessonTitle(summary){
 
     if(!summary) return "Class notes";
@@ -2948,8 +3041,8 @@ function makeLessonTitle(summary){
 
 /* =================================
    SAVED CLASSES — library
-
 ================================= */
+
 function getSavedLessons(){
 
     try{
@@ -3028,14 +3121,7 @@ function loadLesson(id){
 
         const li = document.createElement("li");
 
-        if(typeof t === "object" && t !== null){
-            li.textContent =
-                t.term
-                    ? t.term + (t.definition ? " — " + t.definition : "")
-                    : JSON.stringify(t);
-        }else{
-            li.textContent = t;
-        }
+        li.textContent = t;
 
         terms.appendChild(li);
 
@@ -3077,7 +3163,7 @@ function loadLesson(id){
 
     });
 
-    currentFlashcards = lesson.q_cards || lesson.flashcards || [];
+    currentFlashcards = lesson.flashcards || [];
 
     currentCardIndex = 0;
 
