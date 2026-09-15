@@ -74,7 +74,6 @@ body{
    Fixed behind everything so every
    glass surface reveals the same
    scene underneath it.
-================================= */
 
 .bg-photo{
     position:fixed;
@@ -116,7 +115,6 @@ button{
    blurred, saturated. Matte
    surfaces sit inside glass shells
    to hold focus without competing.
-================================= */
 
 .glass{
     position:relative;
@@ -201,7 +199,6 @@ button{
 
 /* =================================
    HEADER
-================================= */
 
 header{
     min-height:68px;
@@ -310,7 +307,6 @@ header{
 
 /* =================================
    MAIN GRID
-================================= */
 
 .grid{
     display:grid;
@@ -351,7 +347,6 @@ header{
 
 /* =================================
    MICROPHONE AREA
-================================= */
 
 .mic-area{
     min-height:440px;
@@ -529,7 +524,6 @@ header{
    GENERATE BUTTON
    Solid, matte, high-contrast —
    the one bold accent in the frame.
-================================= */
 
 .generate{
     margin-top:24px;
@@ -592,7 +586,6 @@ header{
 
 /* =================================
    TABS
-================================= */
 
 .tabs{
     display:flex;
@@ -652,7 +645,6 @@ header{
 
 /* =================================
    PANELS
-================================= */
 
 .panel{
     display:none;
@@ -669,7 +661,6 @@ header{
    TRANSCRIPT
    Matte, recessed — a quiet
    reading surface, not glass.
-================================= */
 
 .transcript{
     min-height:284px;
@@ -721,7 +712,6 @@ header{
 
 /* =================================
    STATS
-================================= */
 
 .stats{
     display:flex;
@@ -740,7 +730,6 @@ header{
 
 /* =================================
    NOTES
-================================= */
 
 .summary h2{
     font-size:19px;
@@ -858,7 +847,6 @@ header{
 
 /* =================================
    Q CARDS
-================================= */
 
 .qcards-empty,
 .saved-empty{
@@ -1006,7 +994,6 @@ header{
 
 /* =================================
    SEARCH + SAVED CLASSES
-================================= */
 
 .search-bar{
     width:100%;
@@ -1103,7 +1090,6 @@ header{
 
 /* =================================
    LOADING / ERROR
-================================= */
 
 .loading{
     color:var(--blue) !important;
@@ -1116,7 +1102,6 @@ header{
 
 /* =================================
    ANIMATIONS
-================================= */
 
 @keyframes micPulse{
 
@@ -1185,7 +1170,6 @@ header{
 
 /* =================================
    ACCESSIBILITY
-================================= */
 
 @media(prefers-reduced-motion:reduce){
 
@@ -1213,7 +1197,6 @@ button:focus-visible,
 
 /* =================================
    MOBILE
-================================= */
 
 @media(max-width:760px){
 
@@ -1695,7 +1678,6 @@ button:focus-visible,
 
 /* =================================
    BACKEND
-================================= */
 
 const BACKEND =
     "https://classnotes-i4nn.onrender.com";
@@ -1703,7 +1685,6 @@ const BACKEND =
 
 /* =================================
    STATE
-================================= */
 
 let recognition = null;
 
@@ -1720,7 +1701,6 @@ let interimTranscript = "";
 
 /* =================================
    ELEMENTS
-================================= */
 
 const micButton =
     document.getElementById("micButton");
@@ -1817,7 +1797,6 @@ const SAVED_KEY = "classnotes_saved_lessons";
 
 /* =================================
    TABS
-================================= */
 
 document
 .querySelectorAll(".tab")
@@ -1858,7 +1837,6 @@ document
 
 /* =================================
    BACKEND CHECK
-================================= */
 
 async function checkBackend(){
 
@@ -1901,7 +1879,6 @@ checkBackend();
 
 /* =================================
    AUDIO RECORDING ENGINE
-================================= */
 
 let mediaRecorder = null;
 let audioChunks = [];
@@ -1910,7 +1887,6 @@ let audioStream = null;
 
 /* =================================
    MICROPHONE BUTTON
-================================= */
 
 if(!micButton){
 
@@ -1948,7 +1924,6 @@ if(!micButton){
 
 /* =================================
    START RECORDING
-================================= */
 
 async function startListening(){
 
@@ -2185,7 +2160,6 @@ async function startListening(){
 
 /* =================================
    STOP RECORDING
-================================= */
 
 function stopListening(){
 
@@ -2230,7 +2204,6 @@ function stopListening(){
 
 /* =================================
    MICROPHONE ERROR
-================================= */
 
 function showMicError(message){
 
@@ -2290,7 +2263,6 @@ function showMicError(message){
 
 /* =================================
    TRANSCRIBE RECORDING
-================================= */
 
 
 
@@ -2409,7 +2381,6 @@ async function transcribeRecording(audioBlob){
 
 /* =================================
    UPDATE TRANSCRIPT
-================================= */
 
 function updateTranscript(){
 
@@ -2463,7 +2434,6 @@ function updateTranscript(){
 
 /* =================================
    GENERATE NOTES
-================================= */
 
 async function processTranscript(){
 
@@ -2824,10 +2794,8 @@ async function processTranscript(){
 
 /* =================================
    MANUAL GENERATE
-================================= */
 
 
-================================= */
 
 generateButton.addEventListener(
     "click",
@@ -2847,7 +2815,6 @@ generateButton.addEventListener(
 
 /* =================================
    Q CARDS — render / navigate / flip
-================================= */
 
 function renderFlashcard(){
 
@@ -2927,7 +2894,6 @@ qcardNext.addEventListener(
 
 /* =================================
    LESSON TITLE HEURISTIC
-================================= */
 
 function makeLessonTitle(summary){
 
@@ -2949,7 +2915,6 @@ function makeLessonTitle(summary){
 
 /* =================================
    SAVED CLASSES — library
-================================= */
 
 function getSavedLessons(){
 
