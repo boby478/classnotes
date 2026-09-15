@@ -1914,12 +1914,57 @@ let audioStream = null;
 
 micButton.addEventListener(
     "click",
-    () => {
+    async () => {
 
-        if(listening){
-            stopListening();
-        }else{
-            startListening();
+        console.log("CLASSNOTES MIC BUTTON CLICKED");
+
+        try {
+
+            if (listening) {
+
+                stopListening();
+
+            } else {
+
+                await startListening();
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "MIC BUTTON ERROR:",
+                error
+            );
+
+            listening = false;
+
+            if (audioStream) {
+
+                audioStream
+                    .getTracks()
+                    .forEach(track => track.stop());
+
+                audioStream = null;
+            }
+
+            statusDot.classList.remove("listening");
+            statusDot.classList.remove("processing");
+
+            statusText.textContent =
+                "Microphone error";
+
+            micLabel.textContent =
+                "Microphone unavailable";
+
+            micSub.textContent =
+                error.message ||
+                "Could not access your microphone.";
+
+            alert(
+                "ClassNotes microphone error:\\n\\n" +
+                error.message
+            );
         }
 
     }
