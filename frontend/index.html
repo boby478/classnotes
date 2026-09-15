@@ -2852,5 +2852,171 @@ generateButton.addEventListener(
 </script>
 <!-- /CLASSNOTES_AI_BRIDGE -->
 
+
+<!-- CLASSNOTES-STUDY-PACK -->
+<style>
+#cnStudyBtn{position:fixed;right:20px;bottom:20px;z-index:99999;border:0;border-radius:18px;padding:14px 20px;font-size:15px;font-weight:700;cursor:pointer;background:#111;color:white;box-shadow:0 10px 35px #0005}
+#cnStudyPanel{display:none;position:fixed;inset:5%;z-index:99998;background:rgba(20,20,25,.97);color:white;border:1px solid #ffffff22;border-radius:25px;padding:25px;overflow:auto;font-family:Arial,sans-serif;box-shadow:0 20px 80px #0008}
+#cnStudyPanel h1{margin-top:0}
+.cnGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.cnBox{background:#ffffff0d;border:1px solid #ffffff15;border-radius:16px;padding:16px}
+.cnBox h3{margin-top:0}
+.cnClose{float:right;border:0;border-radius:10px;padding:8px 12px;cursor:pointer}
+#cnProgress{margin:15px 0}
+#cnQCard{min-height:180px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:22px;cursor:pointer}
+.cnActions button{margin:5px;padding:9px 15px;border:0;border-radius:10px;cursor:pointer}
+#cnSearch{width:100%;padding:12px;border-radius:12px;border:1px solid #ffffff22;background:#ffffff0d;color:white;margin:10px 0}
+</style>
+
+<button id="cnStudyBtn">📚 Study Pack</button>
+
+<div id="cnStudyPanel">
+<button class="cnClose" onclick="document.getElementById('cnStudyPanel').style.display='none'">✕</button>
+<h1>📚 ClassNotes Study Pack</h1>
+
+<input id="cnTitle" placeholder="Class / lesson title"
+style="width:100%;padding:12px;border-radius:12px;border:1px solid #ffffff22;background:#ffffff0d;color:white">
+
+<button id="cnGenerate" style="margin-top:12px;padding:13px 20px;border:0;border-radius:12px;font-weight:bold;cursor:pointer">
+Generate Study Pack
+</button>
+
+<div id="cnProgress"></div>
+
+<div class="cnGrid">
+<div class="cnBox"><h3>📝 Summary</h3><div id="cnSummary">—</div></div>
+<div class="cnBox"><h3>🎯 Key Points</h3><div id="cnKeys">—</div></div>
+<div class="cnBox"><h3>📖 Important Terms</h3><div id="cnTerms">—</div></div>
+<div class="cnBox"><h3>❓ Questions</h3><div id="cnQuestions">—</div></div>
+<div class="cnBox"><h3>🧠 Things to Remember</h3><div id="cnRemember">—</div></div>
+<div class="cnBox"><h3>📝 Exam Points</h3><div id="cnExam">—</div></div>
+</div>
+
+<div class="cnBox" style="margin-top:15px">
+<h3>🃏 Q Cards</h3>
+<div id="cnQCard">Generate a study pack to create Q Cards.</div>
+<div class="cnActions">
+<button onclick="cnPrev()">← Previous</button>
+<button onclick="cnFlip()">Flip</button>
+<button onclick="cnNext()">Next →</button>
+</div>
+</div>
+
+<div class="cnBox" style="margin-top:15px">
+<h3>🔎 Search Saved Classes</h3>
+<input id="cnSearch" placeholder="Search your saved classes..." oninput="cnSearchSaved()">
+<div id="cnSaved"></div>
+</div>
+</div>
+
+<script>
+let cnPack=null,cnCards=[],cnCardIndex=0,cnFlipped=false;
+
+function cnFindTranscript(){
+ const els=[...document.querySelectorAll("textarea,input,[contenteditable='true'],.transcript,#transcript")];
+ els.sort((a,b)=>(b.value||b.innerText||"").length-(a.value||a.innerText||"").length);
+ return els.length ? (els[0].value||els[0].innerText||"").trim() : "";
+}
+
+function cnList(a){
+ if(!Array.isArray(a)||!a.length)return "<p>—</p>";
+ return "<ul>"+a.map(x=>"<li>"+(typeof x==="string"?x:(x.term+" — "+x.definition))+"</li>").join("")+"</ul>";
+}
+
+function cnRender(){
+ if(!cnPack)return;
+ document.getElementById("cnSummary").innerText=cnPack.summary||"—";
+ document.getElementById("cnKeys").innerHTML=cnList(cnPack.key_points);
+ document.getElementById("cnTerms").innerHTML=cnList(cnPack.important_terms);
+ document.getElementById("cnQuestions").innerHTML=cnList(cnPack.questions);
+ document.getElementById("cnRemember").innerHTML=cnList(cnPack.things_to_remember);
+ document.getElementById("cnExam").innerHTML=cnList(cnPack.exam_points);
+ cnCards=cnPack.q_cards||[];
+ cnCardIndex=0;cnFlipped=false;cnShowCard();
+}
+
+function cnShowCard(){
+ const e=document.getElementById("cnQCard");
+ if(!cnCards.length){e.innerText="No Q Cards generated.";return}
+ const c=cnCards[cnCardIndex];
+ e.innerText=cnFlipped?c.answer:c.question;
+}
+
+function cnFlip(){if(cnCards.length){cnFlipped=!cnFlipped;cnShowCard()}}
+function cnNext(){if(cnCards.length){cnCardIndex=(cnCardIndex+1)%cnCards.length;cnFlipped=false;cnShowCard()}}
+function cnPrev(){if(cnCards.length){cnCardIndex=(cnCardIndex-1+cnCards.length)%cnCards.length;cnFlipped=false;cnShowCard()}}
+
+function cnSave(){
+ let saved=JSON.parse(localStorage.getItem("classnotes_saved")||"[]");
+ saved.unshift({
+  id:Date.now(),
+  title:document.getElementById("cnTitle").value||cnPack.title||"Untitled Class",
+  date:new Date().toLocaleString(),
+  pack:cnPack
+ });
+ localStorage.setItem("classnotes_saved",JSON.stringify(saved.slice(0,100)));
+ cnSearchSaved();
+}
+
+function cnSearchSaved(){
+ let saved=JSON.parse(localStorage.getItem("classnotes_saved")||"[]");
+ let q=(document.getElementById("cnSearch").value||"").toLowerCase();
+ saved=saved.filter(x=>(x.title+" "+x.date).toLowerCase().includes(q));
+ document.getElementById("cnSaved").innerHTML=saved.map(x=>
+ `<div class="cnBox" style="margin:8px 0;cursor:pointer" onclick='cnLoad(${x.id})'>
+ <b>${x.title}</b><br><small>${x.date}</small></div>`).join("")||"No saved classes.";
+}
+
+function cnLoad(id){
+ let saved=JSON.parse(localStorage.getItem("classnotes_saved")||"[]");
+ let x=saved.find(a=>a.id===id);
+ if(!x)return;
+ cnPack=x.pack;
+ document.getElementById("cnTitle").value=x.title;
+ cnRender();
+}
+
+document.getElementById("cnStudyBtn").onclick=()=>{
+ document.getElementById("cnStudyPanel").style.display="block";
+ cnSearchSaved();
+};
+
+document.getElementById("cnGenerate").onclick=async()=>{
+ const text=cnFindTranscript();
+ const progress=document.getElementById("cnProgress");
+
+ if(!text){
+  progress.innerText="⚠️ I couldn't find the transcript. Make sure your transcript is on the page.";
+  return;
+ }
+
+ progress.innerText="⏳ Processing your class in chunks...";
+
+ try{
+  const r=await fetch("/study-pack",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({text})
+  });
+
+  const data=await r.json();
+
+  if(!r.ok)throw new Error(data.details||data.error||"Processing failed");
+
+  cnPack=data.study_pack;
+  if(!document.getElementById("cnTitle").value)
+   document.getElementById("cnTitle").value=cnPack.title||"Class Lesson";
+
+  cnRender();
+  cnSave();
+
+  progress.innerText="✅ Study Pack complete — "+data.chunks_processed+" transcript chunk(s) processed.";
+ }catch(e){
+  progress.innerText="❌ "+e.message;
+ }
+};
+</script>
+<!-- END CLASSNOTES-STUDY-PACK -->
+
 </body>
 </html>
