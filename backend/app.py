@@ -10,7 +10,7 @@ app = Flask(__name__, static_folder="../frontend", static_url_path="")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.5-flash"
 
 
 def call_gemini(prompt):
