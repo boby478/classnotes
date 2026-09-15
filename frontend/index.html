@@ -75,6 +75,7 @@ body{
    glass surface reveals the same
    scene underneath it.
 
+================================= */
 .bg-photo{
     position:fixed;
     inset:0;
@@ -116,6 +117,7 @@ button{
    surfaces sit inside glass shells
    to hold focus without competing.
 
+================================= */
 .glass{
     position:relative;
 
@@ -200,6 +202,7 @@ button{
 /* =================================
    HEADER
 
+================================= */
 header{
     min-height:68px;
 
@@ -308,6 +311,7 @@ header{
 /* =================================
    MAIN GRID
 
+================================= */
 .grid{
     display:grid;
 
@@ -348,6 +352,7 @@ header{
 /* =================================
    MICROPHONE AREA
 
+================================= */
 .mic-area{
     min-height:440px;
 
@@ -525,6 +530,7 @@ header{
    Solid, matte, high-contrast —
    the one bold accent in the frame.
 
+================================= */
 .generate{
     margin-top:24px;
 
@@ -587,6 +593,7 @@ header{
 /* =================================
    TABS
 
+================================= */
 .tabs{
     display:flex;
 
@@ -646,6 +653,7 @@ header{
 /* =================================
    PANELS
 
+================================= */
 .panel{
     display:none;
 
@@ -662,6 +670,7 @@ header{
    Matte, recessed — a quiet
    reading surface, not glass.
 
+================================= */
 .transcript{
     min-height:284px;
 
@@ -713,6 +722,7 @@ header{
 /* =================================
    STATS
 
+================================= */
 .stats{
     display:flex;
 
@@ -731,6 +741,7 @@ header{
 /* =================================
    NOTES
 
+================================= */
 .summary h2{
     font-size:19px;
 
@@ -848,6 +859,7 @@ header{
 /* =================================
    Q CARDS
 
+================================= */
 .qcards-empty,
 .saved-empty{
     color:var(--ink-faint);
@@ -995,6 +1007,7 @@ header{
 /* =================================
    SEARCH + SAVED CLASSES
 
+================================= */
 .search-bar{
     width:100%;
 
@@ -1091,6 +1104,7 @@ header{
 /* =================================
    LOADING / ERROR
 
+================================= */
 .loading{
     color:var(--blue) !important;
 }
@@ -1103,6 +1117,7 @@ header{
 /* =================================
    ANIMATIONS
 
+================================= */
 @keyframes micPulse{
 
     0%,100%{
@@ -1171,6 +1186,7 @@ header{
 /* =================================
    ACCESSIBILITY
 
+================================= */
 @media(prefers-reduced-motion:reduce){
 
     .status-dot.listening,
@@ -1198,6 +1214,7 @@ button:focus-visible,
 /* =================================
    MOBILE
 
+================================= */
 @media(max-width:760px){
 
     body{
@@ -1679,6 +1696,7 @@ button:focus-visible,
 /* =================================
    BACKEND
 
+================================= */
 const BACKEND =
     "https://classnotes-i4nn.onrender.com";
 
@@ -1686,6 +1704,7 @@ const BACKEND =
 /* =================================
    STATE
 
+================================= */
 let recognition = null;
 
 let listening = false;
@@ -1702,6 +1721,7 @@ let interimTranscript = "";
 /* =================================
    ELEMENTS
 
+================================= */
 const micButton =
     document.getElementById("micButton");
 
@@ -1798,6 +1818,7 @@ const SAVED_KEY = "classnotes_saved_lessons";
 /* =================================
    TABS
 
+================================= */
 document
 .querySelectorAll(".tab")
 .forEach(button => {
@@ -1838,6 +1859,7 @@ document
 /* =================================
    BACKEND CHECK
 
+================================= */
 async function checkBackend(){
 
     try{
@@ -1880,6 +1902,7 @@ checkBackend();
 /* =================================
    AUDIO RECORDING ENGINE
 
+================================= */
 let mediaRecorder = null;
 let audioChunks = [];
 let audioStream = null;
@@ -1888,6 +1911,7 @@ let audioStream = null;
 /* =================================
    MICROPHONE BUTTON
 
+================================= */
 if(!micButton){
 
     console.error("ClassNotes: micButton was not found.");
@@ -1925,6 +1949,7 @@ if(!micButton){
 /* =================================
    START RECORDING
 
+================================= */
 async function startListening(){
 
     console.log(
@@ -2161,6 +2186,7 @@ async function startListening(){
 /* =================================
    STOP RECORDING
 
+================================= */
 function stopListening(){
 
     console.log(
@@ -2205,6 +2231,7 @@ function stopListening(){
 /* =================================
    MICROPHONE ERROR
 
+================================= */
 function showMicError(message){
 
     listening = false;
@@ -2264,6 +2291,7 @@ function showMicError(message){
 /* =================================
    TRANSCRIBE RECORDING
 
+================================= */
 
 
 async function transcribeRecording(audioBlob){
@@ -2382,6 +2410,7 @@ async function transcribeRecording(audioBlob){
 /* =================================
    UPDATE TRANSCRIPT
 
+================================= */
 function updateTranscript(){
 
     const combined =
@@ -2435,6 +2464,7 @@ function updateTranscript(){
 /* =================================
    GENERATE NOTES
 
+================================= */
 async function processTranscript(){
 
     const text =
@@ -2795,6 +2825,7 @@ async function processTranscript(){
 /* =================================
    MANUAL GENERATE
 
+================================= */
 
 
 generateButton.addEventListener(
@@ -2816,6 +2847,7 @@ generateButton.addEventListener(
 /* =================================
    Q CARDS — render / navigate / flip
 
+================================= */
 function renderFlashcard(){
 
     if(!currentFlashcards.length){
@@ -2895,6 +2927,7 @@ qcardNext.addEventListener(
 /* =================================
    LESSON TITLE HEURISTIC
 
+================================= */
 function makeLessonTitle(summary){
 
     if(!summary) return "Class notes";
@@ -2916,6 +2949,7 @@ function makeLessonTitle(summary){
 /* =================================
    SAVED CLASSES — library
 
+================================= */
 function getSavedLessons(){
 
     try{
