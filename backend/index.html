@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClassNotes</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Arial, Helvetica, sans-serif;
+    background:
+        radial-gradient(circle at top left, #242424 0, #111 38%, #080808 100%);
+    color: #fff;
+}
+
+.app {
+    width: min(1100px, 94%);
+    margin: auto;
+    padding: 25px 0 50px;
+}
+
+header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 25px;
+}
+
+.logo {
+    font-size: 25px;
+    font-weight: 800;
+    letter-spacing: -1px;
+}
+
+.logo span {
+    color: #ff334f;
+}
+
+.status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #aaa;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    background: #4ade80;
+    border-radius: 50%;
+    box-shadow: 0 0 12px #4ade80;
+}
+
+.hero {
+    text-align: center;
+    padding: 25px 10px 30px;
+}
+
+.hero h1 {
+    font-size: clamp(35px, 8vw, 65px);
+    margin: 0;
+    letter-spacing: -3px;
+}
+
+.hero p {
+    color: #999;
+    margin-top: 12px;
+}
+
+.mic-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 20px 0 35px;
+}
+
+.mic-button {
+    width: 125px;
+    height: 125px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.18);
+    background:
+        linear-gradient(145deg, #292929, #0b0b0b);
+    box-shadow:
+        inset 0 1px 1px rgba(255,255,255,.2),
+        0 20px 50px rgba(0,0,0,.6);
+    color: white;
+    font-size: 50px;
+    cursor: pointer;
+    transition: .2s;
+}
+
+.mic-button:active {
+    transform: scale(.94);
+}
+
+.mic-button.listening {
+    background: linear-gradient(145deg, #ff4058, #9d071d);
+    box-shadow:
+        0 0 0 10px rgba(255,50,75,.08),
+        0 0 55px rgba(255,40,65,.35);
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    50% {
+        transform: scale(1.04);
+    }
+}
+
+.mic-label {
+    margin-top: 15px;
+    font-size: 13px;
+    color: #aaa;
+}
+
+.tabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+}
+
+.tab {
+    flex: 0 0 auto;
+    border: 1px solid #292929;
+    background: #111;
+    color: #888;
+    padding: 11px 17px;
+    border-radius: 14px;
+    cursor: pointer;
+}
+
+.tab.active {
+    background: #fff;
+    color: #000;
+}
+
+.panel {
+    display: none;
+    margin-top: 10px;
+    background:
+        linear-gradient(145deg, rgba(35,35,35,.92), rgba(13,13,13,.95));
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 24px;
+    padding: 22px;
+    box-shadow:
+        inset 0 1px rgba(255,255,255,.06),
+        0 20px 60px rgba(0,0,0,.35);
+}
+
+.panel.active {
+    display: block;
+}
+
+.panel-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #777;
+    margin-bottom: 14px;
+}
+
+.transcript {
+    min-height: 180px;
+    white-space: pre-wrap;
+    line-height: 1.7;
+    color: #ddd;
+}
+
+.empty {
+    color: #555;
+}
+
+.summary {
+    font-size: 18px;
+    line-height: 1.6;
+    color: #eee;
+}
+
+ul {
+    padding-left: 20px;
+}
+
+li {
+    margin: 10px 0;
+    line-height: 1.5;
+}
+
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.control {
+    border: 1px solid #333;
+    background: #181818;
+    color: white;
+    padding: 12px 18px;
+    border-radius: 13px;
+    cursor: pointer;
+}
+
+.control:hover {
+    background: #252525;
+}
+
+textarea {
+    width: 100%;
+    min-height: 220px;
+    resize: vertical;
+    background: #090909;
+    color: #ddd;
+    border: 1px solid #292929;
+    border-radius: 15px;
+    padding: 15px;
+    outline: none;
+}
+
+.notice {
+    margin-top: 18px;
+    color: #666;
+    font-size: 11px;
+    text-align: center;
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+<header>
+    <div class="logo">Class<span>Notes</span></div>
+    <div class="status">
+        <div class="dot"></div>
+        LOCAL
+    </div>
+</header>
+
+<section class="hero">
+    <h1>Focus on class.</h1>
+    <p>ClassNotes listens, transcribes and turns lessons into study notes.</p>
+</section>
+
+<div class="mic-area">
+    <button class="mic-button" id="mic">🎙️</button>
+    <div class="mic-label" id="micLabel">Tap to start listening</div>
+</div>
+
+<div class="tabs">
+    <button class="tab active" onclick="showTab('live', this)">Live</button>
+    <button class="tab" onclick="showTab('notes', this)">Notes</button>
+    <button class="tab" onclick="showTab('questions', this)">Questions</button>
+    <button class="tab" onclick="showTab('terms', this)">Terms</button>
+</div>
+
+<div id="live" class="panel active">
+    <div class="panel-title">Live transcript</div>
+    <div id="transcript" class="transcript">
+        <span class="empty">Your class transcript will appear here...</span>
+    </div>
+
+    <div class="controls">
+        <button class="control" onclick="clearTranscript()">Clear</button>
+        <button class="control" onclick="summarize()">Create notes</button>
+    </div>
+</div>
+
+<div id="notes" class="panel">
+    <div class="panel-title">Summary</div>
+    <div id="summary" class="summary">
+        No notes yet.
+    </div>
+
+    <div class="panel-title" style="margin-top:30px">Key points</div>
+    <ul id="points">
+        <li>No notes yet.</li>
+    </ul>
+</div>
+
+<div id="questions" class="panel">
+    <div class="panel-title">Study questions</div>
+    <ul id="questionsList">
+        <li>No questions yet.</li>
+    </ul>
+</div>
+
+<div id="terms" class="panel">
+    <div class="panel-title">Important terms</div>
+    <ul id="termsList">
+        <li>No terms yet.</li>
+    </ul>
+</div>
+
+<div class="notice">
+    ClassNotes runs through your local Termux backend.
+</div>
+
+</div>
+
+<script>
+let recognition;
+let listening = false;
+let transcriptText = "";
+
+const mic = document.getElementById("mic");
+const micLabel = document.getElementById("micLabel");
+const transcriptBox = document.getElementById("transcript");
+
+const SpeechRecognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
+
+if (SpeechRecognition) {
+
+    recognition = new SpeechRecognition();
+
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    recognition.onresult = function(event) {
+
+        let finalText = "";
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const result = event.results[i];
+
+            if (result.isFinal) {
+                finalText += result[0].transcript + " ";
+            }
+        }
+
+        if (finalText) {
+            transcriptText += finalText;
+            renderTranscript();
+        }
+    };
+
+    recognition.onend = function() {
+        if (listening) {
+            try {
+                recognition.start();
+            } catch(e) {}
+        }
+    };
+
+    recognition.onerror = function(event) {
+        console.log("Speech error:", event.error);
+    };
+
+} else {
+    micLabel.textContent =
+        "Speech recognition is not supported in this browser";
+}
+
+mic.onclick = function() {
+
+    if (!recognition) return;
+
+    if (!listening) {
+
+        listening = true;
+
+        mic.classList.add("listening");
+        micLabel.textContent = "Listening...";
+
+        try {
+            recognition.start();
+        } catch(e) {}
+
+    } else {
+
+        listening = false;
+
+        mic.classList.remove("listening");
+        micLabel.textContent = "Tap to start listening";
+
+        try {
+            recognition.stop();
+        } catch(e) {}
+    }
+};
+
+function renderTranscript() {
+    transcriptBox.textContent =
+        transcriptText || "Your class transcript will appear here...";
+}
+
+function clearTranscript() {
+    transcriptText = "";
+    transcriptBox.innerHTML =
+        '<span class="empty">Your class transcript will appear here...</span>';
+}
+
+function showTab(id, button) {
+
+    document.querySelectorAll(".panel")
+        .forEach(p => p.classList.remove("active"));
+
+    document.querySelectorAll(".tab")
+        .forEach(t => t.classList.remove("active"));
+
+    document.getElementById(id).classList.add("active");
+    button.classList.add("active");
+}
+
+async function summarize() {
+
+    if (!transcriptText.trim()) {
+        alert("There is no transcript yet.");
+        return;
+    }
+
+    const button = event.target;
+    button.textContent = "Creating...";
+
+    try {
+
+        const response = await fetch("/summarize", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                text: transcriptText
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+
+        document.getElementById("summary").textContent =
+            data.summary || "No summary.";
+
+        fillList("points", data.key_points);
+        fillList("questionsList", data.questions);
+        fillList("termsList", data.important_terms);
+
+        showTab(
+            "notes",
+            document.querySelectorAll(".tab")[1]
+        );
+
+    } catch(error) {
+
+        alert("Could not contact ClassNotes backend.");
+        console.error(error);
+
+    } finally {
+        button.textContent = "Create notes";
+    }
+}
+
+function fillList(id, items) {
+
+    const list = document.getElementById(id);
+    list.innerHTML = "";
+
+    if (!items || !items.length) {
+        list.innerHTML = "<li>None</li>";
+        return;
+    }
+
+    items.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        list.appendChild(li);
+    });
+}
+</script>
+
+</body>
+</html>

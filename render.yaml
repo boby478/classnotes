@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: classnotes
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: gunicorn --chdir backend app:app
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false

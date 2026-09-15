@@ -1,0 +1,2701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#141414">
+
+<title>ClassNotes — AI Classroom Companion</title>
+
+<style>
+
+*{
+    box-sizing:border-box;
+    margin:0;
+    padding:0;
+}
+
+:root{
+    --bg-0:#0d0d0f;
+    --bg-1:#17171a;
+    --bg-2:#1f1f23;
+
+    --glass:rgba(255,255,255,.055);
+    --glass-strong:rgba(255,255,255,.09);
+    --matte:rgba(255,255,255,.035);
+
+    --hairline:rgba(255,255,255,.09);
+    --hairline-soft:rgba(255,255,255,.055);
+
+    --ink:#f5f5f7;
+    --ink-dim:#98989d;
+    --ink-faint:#68686d;
+
+    --blue:#0a84ff;
+    --green:#30d158;
+    --red:#ff453a;
+    --purple:#bf5af2;
+
+    --radius-xl:26px;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:10px;
+}
+
+html{
+    scroll-behavior:smooth;
+}
+
+body{
+    min-height:100vh;
+
+    font-family:
+        -apple-system,
+        "SF Pro Text",
+        "SF Pro Display",
+        system-ui,
+        "Segoe UI",
+        sans-serif;
+
+    color:var(--ink);
+
+    background:transparent;
+
+    padding:20px;
+
+    overflow-x:hidden;
+
+    -webkit-font-smoothing:antialiased;
+}
+
+
+/* =================================
+   BACKGROUND PHOTO
+   Fixed behind everything so every
+   glass surface reveals the same
+   scene underneath it.
+================================= */
+
+.bg-photo{
+    position:fixed;
+    inset:0;
+
+    z-index:-2;
+
+    background-image:url("bg.jpg");
+
+    background-size:cover;
+
+    background-position:center;
+
+    background-repeat:no-repeat;
+}
+
+.bg-tint{
+    position:fixed;
+    inset:0;
+
+    z-index:-1;
+
+    background:
+        radial-gradient(
+            ellipse 900px 600px at 12% -6%,
+            rgba(10,132,255,.16),
+            transparent 60%
+        ),
+        radial-gradient(
+            ellipse 800px 700px at 92% 96%,
+            rgba(191,90,242,.12),
+            transparent 62%
+        ),
+        radial-gradient(
+            ellipse 1400px 1000px at 50% 45%,
+            transparent 55%,
+            rgba(6,6,8,.32) 100%
+        ),
+        rgba(10,10,12,.3);
+}
+
+button{
+    font-family:inherit;
+}
+
+.app{
+    width:min(1120px,100%);
+    margin:auto;
+}
+
+
+/* =================================
+   SURFACES — glass vs matte
+   Apple's vibrancy: translucent,
+   blurred, saturated. Matte
+   surfaces sit inside glass shells
+   to hold focus without competing.
+================================= */
+
+.glass{
+    position:relative;
+
+    overflow:hidden;
+
+    background:
+        linear-gradient(
+            160deg,
+            rgba(255,255,255,.055),
+            rgba(255,255,255,.01)
+        );
+
+    border:1px solid var(--hairline);
+
+    box-shadow:
+        0 20px 60px rgba(0,0,0,.35),
+        inset 0 1.5px 0 rgba(255,255,255,.45),
+        inset 0 -1px 0 rgba(0,0,0,.3);
+
+    backdrop-filter:saturate(170%);
+    -webkit-backdrop-filter:saturate(170%);
+}
+
+.glass::before{
+    content:"";
+
+    position:absolute;
+
+    inset:0;
+
+    pointer-events:none;
+
+    background:
+        linear-gradient(
+            115deg,
+            rgba(255,255,255,.45) 0%,
+            rgba(255,255,255,.08) 10%,
+            transparent 24%,
+            transparent 70%,
+            rgba(255,255,255,.12) 86%,
+            rgba(255,255,255,.02) 100%
+        );
+}
+
+.glass::after{
+    content:"";
+
+    position:absolute;
+
+    inset:0;
+
+    pointer-events:none;
+
+    background:
+        radial-gradient(
+            circle 60px at 84% 8%,
+            rgba(255,255,255,.55),
+            transparent 70%
+        ),
+        radial-gradient(
+            circle 24px at 60% 64%,
+            rgba(255,255,255,.28),
+            transparent 75%
+        ),
+        radial-gradient(
+            ellipse 70% 90% at -10% -25%,
+            rgba(255,255,255,.18),
+            transparent 65%
+        );
+
+    background-repeat:no-repeat;
+
+    animation:glassDrift 15s ease-in-out infinite alternate;
+}
+
+.grid .card:nth-of-type(2)::after{
+    background:
+        radial-gradient(
+            circle 46px at 20% 12%,
+            rgba(255,255,255,.5),
+            transparent 70%
+        ),
+        radial-gradient(
+            circle 30px at 72% 70%,
+            rgba(255,255,255,.24),
+            transparent 75%
+        ),
+        radial-gradient(
+            ellipse 70% 90% at 110% -20%,
+            rgba(255,255,255,.16),
+            transparent 65%
+        );
+}
+
+.matte{
+    position:relative;
+
+    overflow:hidden;
+
+    background:rgba(255,255,255,.03);
+
+    border:1px solid var(--hairline-soft);
+
+    box-shadow:
+        inset 0 1.5px 0 rgba(255,255,255,.3),
+        inset 0 -1px 0 rgba(0,0,0,.2);
+
+    backdrop-filter:saturate(140%);
+    -webkit-backdrop-filter:saturate(140%);
+}
+
+.matte::before{
+    content:"";
+
+    position:absolute;
+
+    inset:0;
+
+    pointer-events:none;
+
+    background:
+        linear-gradient(
+            115deg,
+            rgba(255,255,255,.28) 0%,
+            transparent 20%,
+            transparent 72%,
+            rgba(255,255,255,.08) 100%
+        );
+}
+
+
+/* =================================
+   HEADER
+================================= */
+
+header{
+    min-height:68px;
+
+    border-radius:var(--radius-lg);
+
+    padding:13px 20px;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:space-between;
+
+    margin-bottom:18px;
+
+    animation:riseIn .55s cubic-bezier(.16,1,.3,1) both;
+}
+
+.brand{
+    display:flex;
+
+    align-items:center;
+
+    gap:12px;
+}
+
+.logo{
+    width:38px;
+    height:38px;
+
+    border-radius:11px;
+
+    display:grid;
+    place-items:center;
+
+    font-size:17px;
+
+    background:
+        linear-gradient(
+            155deg,
+            var(--blue),
+            #5e5ce6
+        );
+
+    box-shadow:
+        0 6px 18px rgba(10,132,255,.35),
+        inset 0 1px 1px rgba(255,255,255,.35);
+}
+
+.brand h1{
+    font-size:17px;
+
+    font-weight:600;
+
+    letter-spacing:-.3px;
+}
+
+.brand p{
+    color:var(--ink-dim);
+
+    font-size:12px;
+
+    margin-top:2px;
+}
+
+.status{
+    display:flex;
+
+    align-items:center;
+
+    gap:8px;
+
+    font-size:12px;
+
+    color:var(--ink-dim);
+}
+
+.status-dot{
+    width:7px;
+    height:7px;
+
+    border-radius:50%;
+
+    background:var(--green);
+
+    box-shadow:0 0 10px rgba(48,209,88,.7);
+}
+
+.status-dot.listening{
+    background:var(--red);
+
+    box-shadow:0 0 12px rgba(255,69,58,.75);
+
+    animation:statusPulse 1.3s infinite;
+}
+
+.status-dot.processing{
+    background:var(--blue);
+
+    box-shadow:0 0 12px rgba(10,132,255,.75);
+
+    animation:statusPulse 1s infinite;
+}
+
+
+/* =================================
+   MAIN GRID
+================================= */
+
+.grid{
+    display:grid;
+
+    grid-template-columns:
+        minmax(0,.88fr)
+        minmax(0,1.12fr);
+
+    gap:16px;
+}
+
+.card{
+    border-radius:var(--radius-xl);
+
+    padding:24px;
+
+    animation:riseIn .6s cubic-bezier(.16,1,.3,1) both;
+}
+
+.grid .card:nth-of-type(1){
+    animation-delay:.06s;
+}
+
+.grid .card:nth-of-type(2){
+    animation-delay:.13s;
+}
+
+.card-title{
+    color:var(--ink-dim);
+
+    font-size:12px;
+
+    font-weight:600;
+
+    margin-bottom:16px;
+}
+
+
+/* =================================
+   MICROPHONE AREA
+================================= */
+
+.mic-area{
+    min-height:440px;
+
+    display:flex;
+
+    flex-direction:column;
+
+    align-items:center;
+
+    justify-content:center;
+
+    text-align:center;
+}
+
+.mic-button{
+    width:140px;
+    height:140px;
+
+    border-radius:50%;
+
+    border:1px solid var(--hairline);
+
+    background:
+        radial-gradient(
+            circle at 30% 20%,
+            rgba(255,255,255,.55),
+            transparent 42%
+        ),
+        radial-gradient(
+            circle at 75% 82%,
+            rgba(255,255,255,.1),
+            transparent 55%
+        ),
+        rgba(255,255,255,.05);
+
+    backdrop-filter:saturate(150%);
+    -webkit-backdrop-filter:saturate(150%);
+
+    box-shadow:
+        0 20px 50px rgba(0,0,0,.5),
+        0 45px 34px -26px rgba(0,0,0,.55),
+        inset 0 2px 2px rgba(255,255,255,.35),
+        inset 0 -10px 22px rgba(0,0,0,.2);
+
+    display:grid;
+
+    place-items:center;
+
+    cursor:pointer;
+
+    transition:
+        transform .2s ease,
+        box-shadow .2s ease,
+        border-color .2s ease;
+}
+
+.mic-button:hover{
+    transform:translateY(-2px);
+
+    box-shadow:
+        0 24px 56px rgba(0,0,0,.52),
+        0 0 34px rgba(10,132,255,.14),
+        inset 0 1px 1px rgba(255,255,255,.14);
+}
+
+.mic-button:active{
+    transform:scale(.96);
+}
+
+.mic-button.listening{
+    animation:micPulse 1.8s infinite;
+
+    border-color:rgba(255,69,58,.5);
+
+    box-shadow:
+        0 0 0 10px rgba(255,69,58,.06),
+        0 0 46px rgba(255,69,58,.24),
+        inset 0 1px 1px rgba(255,255,255,.14);
+}
+
+.mic-icon{
+    position:absolute;
+
+    inset:0;
+
+    margin:auto;
+
+    width:32px;
+    height:32px;
+
+    color:var(--ink);
+
+    transition:
+        opacity .25s ease,
+        transform .25s ease;
+}
+
+.waveform{
+    position:absolute;
+
+    inset:0;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    gap:4px;
+
+    opacity:0;
+
+    transform:scale(.8);
+
+    transition:
+        opacity .25s ease,
+        transform .25s ease;
+}
+
+.waveform span{
+    width:4px;
+
+    height:10px;
+
+    border-radius:3px;
+
+    background:var(--ink);
+
+    animation:waveBar 1.1s ease-in-out infinite;
+}
+
+.waveform span:nth-child(1){ animation-delay:0s; }
+.waveform span:nth-child(2){ animation-delay:.15s; }
+.waveform span:nth-child(3){ animation-delay:.3s; }
+.waveform span:nth-child(4){ animation-delay:.15s; }
+.waveform span:nth-child(5){ animation-delay:0s; }
+
+.mic-button.listening .mic-icon{
+    opacity:0;
+
+    transform:scale(.7);
+}
+
+.mic-button.listening .waveform{
+    opacity:1;
+
+    transform:scale(1);
+}
+
+.mic-label{
+    margin-top:28px;
+
+    font-size:17px;
+
+    font-weight:600;
+
+    letter-spacing:-.2px;
+}
+
+.mic-sub{
+    color:var(--ink-faint);
+
+    font-size:12.5px;
+
+    line-height:1.5;
+
+    margin-top:7px;
+
+    max-width:280px;
+}
+
+
+/* =================================
+   GENERATE BUTTON
+   Solid, matte, high-contrast —
+   the one bold accent in the frame.
+================================= */
+
+.generate{
+    margin-top:24px;
+
+    min-width:168px;
+
+    border:none;
+
+    border-radius:980px;
+
+    padding:12px 22px;
+
+    color:#fff;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(255,255,255,.35),
+            rgba(255,255,255,0) 55%
+        ),
+        var(--blue);
+
+    box-shadow:
+        0 10px 24px rgba(10,132,255,.3),
+        inset 0 1px 0 rgba(255,255,255,.5);
+
+    cursor:pointer;
+
+    font-size:13.5px;
+
+    font-weight:600;
+
+    transition:
+        transform .15s ease,
+        background .15s ease,
+        box-shadow .15s ease;
+}
+
+.generate:hover:not(:disabled){
+    background:#2b95ff;
+
+    box-shadow:
+        0 12px 28px rgba(10,132,255,.4);
+}
+
+.generate:active:not(:disabled){
+    transform:scale(.97);
+}
+
+.generate:disabled{
+    background:var(--matte);
+
+    color:var(--ink-faint);
+
+    box-shadow:none;
+
+    cursor:not-allowed;
+}
+
+
+/* =================================
+   TABS
+================================= */
+
+.tabs{
+    display:flex;
+
+    gap:4px;
+
+    padding:4px;
+
+    margin-bottom:16px;
+
+    border-radius:var(--radius-md);
+
+    background:rgba(255,255,255,.03);
+
+    border:1px solid var(--hairline-soft);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.25),
+        inset 0 -1px 0 rgba(0,0,0,.2);
+
+    backdrop-filter:saturate(130%);
+    -webkit-backdrop-filter:saturate(130%);
+}
+
+.tab{
+    flex:1;
+
+    border:0;
+
+    padding:9px;
+
+    border-radius:10px;
+
+    background:transparent;
+
+    color:var(--ink-dim);
+
+    cursor:pointer;
+
+    font-size:13px;
+
+    font-weight:600;
+
+    transition:
+        background .18s ease,
+        color .18s ease;
+}
+
+.tab.active{
+    color:var(--ink);
+
+    background:var(--glass-strong);
+
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+}
+
+
+/* =================================
+   PANELS
+================================= */
+
+.panel{
+    display:none;
+
+    animation:fadeIn .22s ease;
+}
+
+.panel.active{
+    display:block;
+}
+
+
+/* =================================
+   TRANSCRIPT
+   Matte, recessed — a quiet
+   reading surface, not glass.
+================================= */
+
+.transcript{
+    min-height:284px;
+
+    max-height:400px;
+
+    overflow-y:auto;
+
+    border-radius:var(--radius-lg);
+
+    padding:18px;
+
+    background:rgba(255,255,255,.03);
+
+    backdrop-filter:blur(6px) saturate(130%);
+    -webkit-backdrop-filter:blur(6px) saturate(130%);
+
+    border:1px solid var(--hairline-soft);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.22),
+        inset 0 -12px 20px -12px rgba(0,0,0,.35);
+
+    color:#d4d4d9;
+
+    line-height:1.75;
+
+    font-size:13.5px;
+
+    white-space:pre-wrap;
+
+    scrollbar-width:thin;
+}
+
+.transcript-placeholder{
+    color:var(--ink-faint);
+}
+
+.transcript::-webkit-scrollbar{
+    width:5px;
+}
+
+.transcript::-webkit-scrollbar-thumb{
+    background:rgba(255,255,255,.12);
+
+    border-radius:10px;
+}
+
+
+/* =================================
+   STATS
+================================= */
+
+.stats{
+    display:flex;
+
+    justify-content:space-between;
+
+    gap:10px;
+
+    margin-top:12px;
+
+    color:var(--ink-faint);
+
+    font-size:11px;
+}
+
+
+/* =================================
+   NOTES
+================================= */
+
+.summary h2{
+    font-size:19px;
+
+    font-weight:600;
+
+    letter-spacing:-.3px;
+
+    margin-bottom:10px;
+}
+
+.summary p{
+    color:var(--ink-dim);
+
+    line-height:1.7;
+
+    font-size:13.5px;
+}
+
+.section-title{
+    margin-top:20px;
+
+    margin-bottom:9px;
+
+    font-size:12px;
+
+    font-weight:600;
+
+    color:#c2c2c7;
+}
+
+.keypoints,
+.questions,
+.terms{
+    display:flex;
+
+    flex-direction:column;
+
+    gap:6px;
+}
+
+.keypoints li,
+.questions li,
+.terms li{
+    list-style:none;
+
+    padding:11px 13px;
+
+    border-radius:var(--radius-sm);
+
+    background:var(--matte);
+
+    border:1px solid var(--hairline-soft);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.18);
+
+    color:#cfcfd4;
+
+    font-size:12.5px;
+
+    line-height:1.5;
+}
+
+.keypoints li::before{
+    content:"•";
+
+    margin-right:8px;
+
+    color:var(--blue);
+
+    font-weight:bold;
+}
+
+.questions li::before{
+    content:"?";
+
+    margin-right:8px;
+
+    color:var(--purple);
+
+    font-weight:bold;
+}
+
+.terms li::before{
+    content:"◆";
+
+    margin-right:7px;
+
+    font-size:8px;
+
+    color:var(--green);
+}
+
+
+/* =================================
+   LOADING / ERROR
+================================= */
+
+.loading{
+    color:var(--blue) !important;
+}
+
+.error{
+    color:var(--red) !important;
+}
+
+
+/* =================================
+   ANIMATIONS
+================================= */
+
+@keyframes micPulse{
+
+    0%,100%{
+        transform:scale(1);
+    }
+
+    50%{
+        transform:scale(1.03);
+    }
+
+}
+
+@keyframes statusPulse{
+
+    0%,100%{
+        opacity:1;
+    }
+
+    50%{
+        opacity:.4;
+    }
+
+}
+
+@keyframes fadeIn{
+
+    from{
+        opacity:0;
+        transform:translateY(4px);
+    }
+
+    to{
+        opacity:1;
+        transform:translateY(0);
+    }
+
+}
+
+@keyframes glassDrift{
+
+    0%{
+        background-position:
+            0 0,
+            0 0,
+            0 0;
+    }
+
+    100%{
+        background-position:
+            -8px 6px,
+            6px -5px,
+            0 0;
+    }
+
+}
+
+@keyframes waveBar{
+
+    0%,100%{
+        height:10px;
+    }
+
+    50%{
+        height:32px;
+    }
+
+}
+
+@keyframes riseIn{
+
+    from{
+        opacity:0;
+        transform:translateY(14px) scale(.985);
+    }
+
+    to{
+        opacity:1;
+        transform:translateY(0) scale(1);
+    }
+
+}
+
+
+/* =================================
+   ACCESSIBILITY
+================================= */
+
+@media(prefers-reduced-motion:reduce){
+
+    .status-dot.listening,
+    .status-dot.processing,
+    .mic-button.listening,
+    .glass::after,
+    .waveform span,
+    header,
+    .card{
+        animation:none;
+    }
+
+    html{
+        scroll-behavior:auto;
+    }
+
+}
+
+button:focus-visible,
+.tab:focus-visible{
+    outline:2px solid var(--blue);
+    outline-offset:2px;
+}
+
+
+/* =================================
+   MOBILE
+================================= */
+
+@media(max-width:760px){
+
+    body{
+        padding:12px;
+    }
+
+    header{
+        border-radius:18px;
+
+        padding:12px 16px;
+    }
+
+    .grid{
+        grid-template-columns:1fr;
+    }
+
+    .card{
+        border-radius:20px;
+
+        padding:18px;
+    }
+
+    .mic-area{
+        min-height:355px;
+    }
+
+    .mic-button{
+        width:126px;
+        height:126px;
+    }
+
+    .transcript{
+        min-height:230px;
+    }
+
+}
+
+</style>
+</head>
+
+
+<body>
+
+
+<div class="bg-photo"></div>
+<div class="bg-tint"></div>
+
+
+<div class="app">
+
+
+<!-- =================================
+     HEADER
+================================= -->
+
+<header class="glass">
+
+    <div class="brand">
+
+        <div class="logo">
+            ✦
+        </div>
+
+        <div>
+
+            <h1>
+                ClassNotes
+            </h1>
+
+            <p>
+                Your AI classroom companion
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <div class="status">
+
+        <span
+            class="status-dot"
+            id="statusDot"
+        ></span>
+
+        <span id="statusText">
+            Ready
+        </span>
+
+    </div>
+
+</header>
+
+
+
+<div class="grid">
+
+
+<!-- =================================
+     RECORDING CARD
+================================= -->
+
+<section class="glass card">
+
+    <div class="card-title">
+        Live classroom
+    </div>
+
+
+    <div class="mic-area">
+
+
+        <button
+            class="mic-button"
+            id="micButton"
+            aria-label="Start or stop listening"
+        >
+
+            <svg
+                class="mic-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+            >
+                <rect x="9" y="2" width="6" height="12" rx="3"></rect>
+                <path d="M5 10a7 7 0 0 0 14 0"></path>
+                <line x1="12" y1="19" x2="12" y2="22"></line>
+                <line x1="8" y1="22" x2="16" y2="22"></line>
+            </svg>
+
+            <div class="waveform" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+
+        </button>
+
+
+        <div
+            class="mic-label"
+            id="micLabel"
+        >
+            Start listening
+        </div>
+
+
+        <div
+            class="mic-sub"
+            id="micSub"
+        >
+            Tap the microphone to capture your class
+        </div>
+
+
+        <button
+            class="generate"
+            id="generateButton"
+            disabled
+        >
+            Generate Notes
+        </button>
+
+
+    </div>
+
+</section>
+
+
+
+<!-- =================================
+     CONTENT CARD
+================================= -->
+
+<section class="glass card">
+
+
+    <div class="tabs">
+
+        <button
+            class="tab active"
+            data-tab="transcript"
+        >
+            Transcript
+        </button>
+
+
+        <button
+            class="tab"
+            data-tab="summary"
+        >
+            Notes
+        </button>
+
+    </div>
+
+
+
+    <!-- =============================
+         TRANSCRIPT
+    ============================== -->
+
+    <div
+        class="panel active"
+        id="transcript"
+    >
+
+        <div
+            class="transcript"
+            id="transcriptText"
+        >
+
+            <span class="transcript-placeholder">
+                Your full live transcript will appear here...
+            </span>
+
+        </div>
+
+
+        <div class="stats">
+
+            <span id="wordCount">
+                0 words
+            </span>
+
+
+            <span id="connection">
+                Backend: checking...
+            </span>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =============================
+         NOTES
+    ============================== -->
+
+    <div
+        class="panel"
+        id="summary"
+    >
+
+        <div class="summary">
+
+
+            <h2>
+                Class summary
+            </h2>
+
+
+            <p id="summaryText">
+
+                Your AI-generated class notes will appear here.
+
+            </p>
+
+
+
+            <div class="section-title">
+                Key points
+            </div>
+
+
+            <ul
+                class="keypoints"
+                id="keypoints"
+            >
+
+                <li>
+                    Important points will appear here.
+                </li>
+
+            </ul>
+
+
+
+            <div class="section-title">
+                Important terms
+            </div>
+
+
+            <ul
+                class="terms"
+                id="terms"
+            >
+
+                <li>
+                    Important vocabulary will appear here.
+                </li>
+
+            </ul>
+
+
+
+            <div class="section-title">
+                Study questions
+            </div>
+
+
+            <ul
+                class="questions"
+                id="questions"
+            >
+
+                <li>
+                    Study questions will appear here.
+                </li>
+
+            </ul>
+
+
+        </div>
+
+    </div>
+
+
+</section>
+
+
+</div>
+
+</div>
+
+
+
+<script>
+
+
+/* =================================
+   BACKEND
+================================= */
+
+const BACKEND =
+    "http://127.0.0.1:8000";
+
+
+/* =================================
+   STATE
+================================= */
+
+let recognition = null;
+
+let listening = false;
+
+let processing = false;
+
+let restarting = false;
+
+let finalTranscript = "";
+
+let interimTranscript = "";
+
+
+/* =================================
+   ELEMENTS
+================================= */
+
+const micButton =
+    document.getElementById("micButton");
+
+const micLabel =
+    document.getElementById("micLabel");
+
+const micSub =
+    document.getElementById("micSub");
+
+const statusDot =
+    document.getElementById("statusDot");
+
+const statusText =
+    document.getElementById("statusText");
+
+const transcriptText =
+    document.getElementById("transcriptText");
+
+const wordCount =
+    document.getElementById("wordCount");
+
+const connection =
+    document.getElementById("connection");
+
+const generateButton =
+    document.getElementById("generateButton");
+
+const summaryText =
+    document.getElementById("summaryText");
+
+const keypoints =
+    document.getElementById("keypoints");
+
+const terms =
+    document.getElementById("terms");
+
+const questions =
+    document.getElementById("questions");
+
+
+/* =================================
+   TABS
+================================= */
+
+document
+.querySelectorAll(".tab")
+.forEach(button => {
+
+    button.addEventListener(
+        "click",
+        () => {
+
+            document
+            .querySelectorAll(".tab")
+            .forEach(t =>
+                t.classList.remove("active")
+            );
+
+
+            document
+            .querySelectorAll(".panel")
+            .forEach(p =>
+                p.classList.remove("active")
+            );
+
+
+            button.classList.add("active");
+
+
+            document
+            .getElementById(
+                button.dataset.tab
+            )
+            .classList.add("active");
+
+        }
+    );
+
+});
+
+
+/* =================================
+   BACKEND CHECK
+================================= */
+
+async function checkBackend(){
+
+    try{
+
+        const response =
+            await fetch(
+                BACKEND + "/"
+            );
+
+
+        if(!response.ok){
+
+            throw new Error(
+                "HTTP " +
+                response.status
+            );
+
+        }
+
+
+        connection.textContent =
+            "Backend: online";
+
+
+    }catch(error){
+
+        console.error(error);
+
+        connection.textContent =
+            "Backend: offline";
+
+    }
+
+}
+
+
+checkBackend();
+
+
+/* =================================
+   SPEECH
+================================= */
+
+const SpeechRecognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
+
+
+if(SpeechRecognition){
+
+    createRecognition();
+
+}else{
+
+    micSub.textContent =
+        "Speech recognition is not supported. Try Chrome.";
+
+}
+
+
+/* =================================
+   CREATE RECOGNITION
+================================= */
+
+function createRecognition(){
+
+    recognition =
+        new SpeechRecognition();
+
+
+    recognition.continuous =
+        true;
+
+
+    recognition.interimResults =
+        true;
+
+
+    recognition.maxAlternatives =
+        1;
+
+
+    recognition.lang =
+        "en-ZA";
+
+
+    recognition.onstart =
+        () => {
+
+            restarting = false;
+
+
+            if(!listening)
+                return;
+
+
+            statusDot
+                .classList
+                .add("listening");
+
+
+            statusDot
+                .classList
+                .remove("processing");
+
+
+            statusText.textContent =
+                "Listening";
+
+
+            micButton
+                .classList
+                .add("listening");
+
+
+            micLabel.textContent =
+                "Listening…";
+
+
+            micSub.textContent =
+                "Listening continuously";
+
+        };
+
+
+    recognition.onresult =
+        event => {
+
+            interimTranscript = "";
+
+
+            for(
+                let i = event.resultIndex;
+                i < event.results.length;
+                i++
+            ){
+
+                const result =
+                    event.results[i];
+
+
+                const text =
+                    result[0]
+                    .transcript
+                    .trim();
+
+
+                if(!text)
+                    continue;
+
+
+                if(result.isFinal){
+
+                    addFinalChunk(text);
+
+                }else{
+
+                    interimTranscript +=
+                        text + " ";
+
+                }
+
+            }
+
+
+            updateTranscript();
+
+        };
+
+
+    recognition.onend =
+        () => {
+
+            console.log(
+                "Recognition ended"
+            );
+
+
+            if(
+                listening &&
+                !processing
+            ){
+
+                if(restarting)
+                    return;
+
+
+                restarting = true;
+
+
+                setTimeout(
+                    () => {
+
+                        if(
+                            !listening ||
+                            processing
+                        ){
+
+                            restarting =
+                                false;
+
+                            return;
+
+                        }
+
+
+                        createRecognition();
+
+
+                        try{
+
+                            recognition.start();
+
+                        }catch(error){
+
+                            console.log(
+                                error
+                            );
+
+                        }
+
+                    },
+                    300
+                );
+
+
+                return;
+
+            }
+
+
+            if(processing){
+
+                processTranscript();
+
+            }
+
+        };
+
+
+    recognition.onerror =
+        event => {
+
+            console.log(
+                "Speech error:",
+                event.error
+            );
+
+
+            if(
+                event.error ===
+                "not-allowed"
+            ){
+
+                listening =
+                    false;
+
+
+                micButton
+                    .classList
+                    .remove("listening");
+
+
+                statusDot
+                    .classList
+                    .remove("listening");
+
+
+                statusText.textContent =
+                    "Microphone blocked";
+
+
+                micLabel.textContent =
+                    "Microphone blocked";
+
+
+                micSub.textContent =
+                    "Allow microphone access in Chrome";
+
+            }
+
+        };
+
+}
+
+
+/* =================================
+   SMART TRANSCRIPT MERGING
+================================= */
+
+function normalizeWords(text){
+
+    return text
+        .toLowerCase()
+        .replace(
+            /[^\p{L}\p{N}\s]/gu,
+            ""
+        )
+        .split(/\s+/)
+        .filter(Boolean);
+
+}
+
+
+function addFinalChunk(chunk){
+
+    chunk =
+        chunk.trim();
+
+
+    if(!chunk)
+        return;
+
+
+    const oldWords =
+        normalizeWords(
+            finalTranscript
+        );
+
+
+    const newWords =
+        normalizeWords(
+            chunk
+        );
+
+
+    if(!newWords.length)
+        return;
+
+
+    /*
+       Exact duplicate chunk.
+    */
+
+    const oldTail =
+        oldWords.slice(
+            -newWords.length
+        );
+
+
+    if(
+        oldTail.length ===
+        newWords.length &&
+        oldTail.every(
+            (word,index) =>
+                word ===
+                newWords[index]
+        )
+    ){
+
+        return;
+
+    }
+
+
+    /*
+       Detect overlapping words.
+    */
+
+    let overlap = 0;
+
+
+    const maxOverlap =
+        Math.min(
+            oldWords.length,
+            newWords.length
+        );
+
+
+    for(
+        let size = maxOverlap;
+        size >= 1;
+        size--
+    ){
+
+        const a =
+            oldWords.slice(-size);
+
+
+        const b =
+            newWords.slice(0,size);
+
+
+        if(
+            a.length === b.length &&
+            a.every(
+                (word,index) =>
+                    word === b[index]
+            )
+        ){
+
+            overlap =
+                size;
+
+            break;
+
+        }
+
+    }
+
+
+    const wordsToAdd =
+        newWords.slice(
+            overlap
+        );
+
+
+    if(!wordsToAdd.length)
+        return;
+
+
+    finalTranscript =
+        (
+            finalTranscript.trim() +
+            " " +
+            wordsToAdd.join(" ")
+        ).trim() + " ";
+
+}
+
+
+/* =================================
+   UPDATE TRANSCRIPT
+================================= */
+
+function updateTranscript(){
+
+    const combined =
+        (
+            finalTranscript +
+            interimTranscript
+        ).trim();
+
+
+    if(!combined){
+
+        transcriptText.innerHTML =
+            '<span class="transcript-placeholder">' +
+            'Listening for speech…' +
+            '</span>';
+
+    }else{
+
+        transcriptText.textContent =
+            combined;
+
+    }
+
+
+    const words =
+        combined
+        .split(/\s+/)
+        .filter(Boolean)
+        .length;
+
+
+    wordCount.textContent =
+        words +
+        (
+            words === 1
+            ? " word"
+            : " words"
+        );
+
+
+    transcriptText.scrollTop =
+        transcriptText.scrollHeight;
+
+
+    generateButton.disabled =
+        words < 3;
+
+}
+
+
+/* =================================
+   START / STOP
+================================= */
+
+micButton.addEventListener(
+    "click",
+    () => {
+
+        if(!recognition){
+
+            alert(
+                "Speech recognition is not supported. Try Chrome."
+            );
+
+            return;
+
+        }
+
+
+        if(listening){
+
+            stopListening();
+
+        }else{
+
+            startListening();
+
+        }
+
+    }
+);
+
+
+function startListening(){
+
+    finalTranscript = "";
+
+    interimTranscript = "";
+
+    restarting = false;
+
+    processing = false;
+
+    listening = true;
+
+
+    transcriptText.innerHTML =
+        '<span class="transcript-placeholder">' +
+        'Listening for speech…' +
+        '</span>';
+
+
+    try{
+
+        recognition.start();
+
+    }catch(error){
+
+        console.log(error);
+
+    }
+
+}
+
+
+function stopListening(){
+
+    listening = false;
+
+    processing = true;
+
+    restarting = false;
+
+
+    micButton
+        .classList
+        .remove("listening");
+
+
+    statusDot
+        .classList
+        .remove("listening");
+
+
+    statusDot
+        .classList
+        .add("processing");
+
+
+    statusText.textContent =
+        "Finishing transcript";
+
+
+    micLabel.textContent =
+        "Finishing…";
+
+
+    micSub.textContent =
+        "Preparing your notes";
+
+
+    try{
+
+        recognition.stop();
+
+    }catch(error){
+
+        processTranscript();
+
+    }
+
+}
+
+
+/* =================================
+   GENERATE NOTES
+================================= */
+
+async function processTranscript(){
+
+    processing = false;
+
+
+    const text =
+        finalTranscript.trim();
+
+
+    interimTranscript = "";
+
+
+    updateTranscript();
+
+
+    if(!text){
+
+        statusDot
+            .classList
+            .remove("processing");
+
+
+        statusText.textContent =
+            "Ready";
+
+
+        micLabel.textContent =
+            "Start listening";
+
+
+        micSub.textContent =
+            "No speech was detected";
+
+
+        return;
+
+    }
+
+
+    statusText.textContent =
+        "AI processing";
+
+
+    micLabel.textContent =
+        "Creating notes…";
+
+
+    micSub.textContent =
+        "Qwen is analyzing your class";
+
+
+    summaryText
+        .classList
+        .remove("error");
+
+
+    summaryText
+        .classList
+        .add("loading");
+
+
+    summaryText.textContent =
+        "Generating your class notes…";
+
+
+    keypoints.innerHTML =
+        "<li class='loading'>" +
+        "Analyzing key points…" +
+        "</li>";
+
+
+    terms.innerHTML =
+        "<li class='loading'>" +
+        "Finding important terms…" +
+        "</li>";
+
+
+    questions.innerHTML =
+        "<li class='loading'>" +
+        "Creating study questions…" +
+        "</li>";
+
+
+    try{
+
+        const response =
+            await fetch(
+                BACKEND +
+                "/summarize",
+                {
+                    method:"POST",
+
+                    headers:{
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:JSON.stringify({
+                        text:text
+                    })
+                }
+            );
+
+
+        const raw =
+            await response.text();
+
+
+        if(!response.ok){
+
+            throw new Error(
+                "Backend HTTP " +
+                response.status +
+                ": " +
+                raw
+            );
+
+        }
+
+
+        const data =
+            JSON.parse(raw);
+
+
+        console.log(
+            "ClassNotes AI:",
+            data
+        );
+
+
+        /* SUMMARY */
+
+        summaryText
+            .classList
+            .remove("loading");
+
+
+        summaryText.textContent =
+            data.summary ||
+            "No summary returned.";
+
+
+        /* KEY POINTS */
+
+        keypoints.innerHTML = "";
+
+
+        if(
+            Array.isArray(
+                data.key_points
+            )
+        ){
+
+            data.key_points
+            .forEach(point => {
+
+                const li =
+                    document.createElement(
+                        "li"
+                    );
+
+                li.textContent =
+                    point;
+
+                keypoints.appendChild(
+                    li
+                );
+
+            });
+
+        }else{
+
+            keypoints.innerHTML =
+                "<li>" +
+                (
+                    data.key_points ||
+                    "No key points returned."
+                ) +
+                "</li>";
+
+        }
+
+
+        /* TERMS */
+
+        terms.innerHTML = "";
+
+
+        if(
+            Array.isArray(
+                data.important_terms
+            )
+        ){
+
+            data.important_terms
+            .forEach(term => {
+
+                const li =
+                    document.createElement(
+                        "li"
+                    );
+
+                li.textContent =
+                    term;
+
+                terms.appendChild(
+                    li
+                );
+
+            });
+
+        }else{
+
+            terms.innerHTML =
+                "<li>" +
+                (
+                    data.important_terms ||
+                    "No important terms returned."
+                ) +
+                "</li>";
+
+        }
+
+
+        /* QUESTIONS */
+
+        questions.innerHTML = "";
+
+
+        if(
+            Array.isArray(
+                data.questions
+            )
+        ){
+
+            data.questions
+            .forEach(question => {
+
+                const li =
+                    document.createElement(
+                        "li"
+                    );
+
+                li.textContent =
+                    question;
+
+                questions.appendChild(
+                    li
+                );
+
+            });
+
+        }else{
+
+            questions.innerHTML =
+                "<li>" +
+                (
+                    data.questions ||
+                    "No questions returned."
+                ) +
+                "</li>";
+
+        }
+
+
+        statusDot
+            .classList
+            .remove("processing");
+
+
+        statusText.textContent =
+            "Complete";
+
+
+        micLabel.textContent =
+            "Start listening";
+
+
+        micSub.textContent =
+            "Your class notes are ready";
+
+
+        /*
+           Open Notes automatically.
+        */
+
+        document
+            .querySelector(
+                '[data-tab="summary"]'
+            )
+            .click();
+
+
+    }catch(error){
+
+        console.error(
+            "ClassNotes error:",
+            error
+        );
+
+
+        summaryText
+            .classList
+            .remove("loading");
+
+
+        summaryText
+            .classList
+            .add("error");
+
+
+        summaryText.textContent =
+            "Couldn't generate notes: " +
+            error.message;
+
+
+        keypoints.innerHTML =
+            "<li class='error'>" +
+            "AI processing failed." +
+            "</li>";
+
+
+        terms.innerHTML =
+            "<li class='error'>" +
+            "No terms were generated." +
+            "</li>";
+
+
+        questions.innerHTML =
+            "<li class='error'>" +
+            "No questions were generated." +
+            "</li>";
+
+
+        statusDot
+            .classList
+            .remove("processing");
+
+
+        statusText.textContent =
+            "AI error";
+
+
+        micLabel.textContent =
+            "Start listening";
+
+
+        micSub.textContent =
+            "Your transcript is still available";
+
+    }
+
+}
+
+
+/* =================================
+   MANUAL GENERATE
+================================= */
+
+generateButton.addEventListener(
+    "click",
+    () => {
+
+        if(
+            finalTranscript.trim()
+        ){
+
+            processTranscript();
+
+        }
+
+    }
+);
+
+</script>
+
+
+<!-- CLASSNOTES_AI_BRIDGE -->
+<script id="CLASSNOTES_AI_BRIDGE">
+(() => {
+    const API = "http://127.0.0.1:8000/summarize";
+
+    function findTranscript() {
+        const elements = [
+            document.querySelector("#transcript"),
+            document.querySelector("#transcriptText"),
+            document.querySelector("#transcriptArea"),
+            document.querySelector("textarea"),
+            document.querySelector("[contenteditable='true']")
+        ];
+
+        for (const el of elements) {
+            if (el) {
+                const text = "value" in el ? el.value : el.innerText;
+                if (text && text.trim().length > 0) return text.trim();
+            }
+        }
+
+        return "";
+    }
+
+    function createNotesPanel() {
+        let panel = document.getElementById("classnotes-ai-output");
+        if (panel) return panel;
+
+        panel = document.createElement("section");
+        panel.id = "classnotes-ai-output";
+
+        panel.innerHTML = `
+            <div class="cn-ai-title">AI Study Notes</div>
+
+            <div class="cn-ai-section">
+                <h3>Summary</h3>
+                <p id="cn-summary">—</p>
+            </div>
+
+            <div class="cn-ai-section">
+                <h3>Key Points</h3>
+                <ul id="cn-key-points"></ul>
+            </div>
+
+            <div class="cn-ai-section">
+                <h3>Important Terms</h3>
+                <ul id="cn-terms"></ul>
+            </div>
+
+            <div class="cn-ai-section">
+                <h3>Questions</h3>
+                <ul id="cn-questions"></ul>
+            </div>
+
+            <div class="cn-ai-section">
+                <h3>Things to Remember</h3>
+                <ul id="cn-remember"></ul>
+            </div>
+
+            <div class="cn-ai-section">
+                <h3>Exam Points</h3>
+                <ul id="cn-exam"></ul>
+            </div>
+        `;
+
+        const style = document.createElement("style");
+        style.textContent = `
+            #classnotes-ai-output {
+                margin: 24px 0;
+                padding: 24px;
+                border-radius: 26px;
+                background: rgba(20,20,23,.72);
+                border: 1px solid rgba(255,255,255,.10);
+                backdrop-filter: blur(25px);
+                -webkit-backdrop-filter: blur(25px);
+                color: #f5f5f7;
+                box-shadow: 0 20px 60px rgba(0,0,0,.25);
+            }
+
+            #classnotes-ai-output .cn-ai-title {
+                font-size: 22px;
+                font-weight: 700;
+                margin-bottom: 20px;
+            }
+
+            #classnotes-ai-output .cn-ai-section {
+                margin-top: 18px;
+                padding: 16px;
+                border-radius: 16px;
+                background: rgba(255,255,255,.045);
+                border: 1px solid rgba(255,255,255,.06);
+            }
+
+            #classnotes-ai-output h3 {
+                margin-bottom: 9px;
+                font-size: 15px;
+            }
+
+            #classnotes-ai-output p,
+            #classnotes-ai-output li {
+                color: #b8b8bd;
+                line-height: 1.55;
+                font-size: 14px;
+            }
+
+            #classnotes-ai-output ul {
+                margin: 0;
+                padding-left: 20px;
+            }
+
+            #classnotes-ai-output li {
+                margin: 7px 0;
+            }
+
+            #classnotes-ai-output.cn-loading {
+                opacity: .7;
+            }
+        `;
+
+        document.head.appendChild(style);
+
+        const main =
+            document.querySelector("main") ||
+            document.querySelector(".container") ||
+            document.body;
+
+        main.appendChild(panel);
+        return panel;
+    }
+
+    function fillList(id, items) {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        el.innerHTML = "";
+
+        (Array.isArray(items) ? items : []).forEach(item => {
+            const li = document.createElement("li");
+            li.textContent = item;
+            el.appendChild(li);
+        });
+
+        if (!items || items.length === 0) {
+            el.innerHTML = "<li>None identified.</li>";
+        }
+    }
+
+    async function generateNotes() {
+        const transcript = findTranscript();
+
+        if (!transcript) {
+            alert("No transcript found yet. Record some class audio first.");
+            return;
+        }
+
+        const panel = createNotesPanel();
+        panel.classList.add("cn-loading");
+
+        document.getElementById("cn-summary").textContent =
+            "Creating your study notes...";
+
+        try {
+            const response = await fetch(API, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    text: transcript
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error("Backend returned HTTP " + response.status);
+            }
+
+            const data = await response.json();
+
+            document.getElementById("cn-summary").textContent =
+                data.summary || "No summary generated.";
+
+            fillList("cn-key-points", data.key_points);
+            fillList("cn-terms", data.important_terms);
+            fillList("cn-questions", data.questions);
+            fillList("cn-remember", data.things_to_remember);
+            fillList("cn-exam", data.exam_points);
+
+            panel.classList.remove("cn-loading");
+            panel.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
+
+        } catch (error) {
+            panel.classList.remove("cn-loading");
+
+            document.getElementById("cn-summary").textContent =
+                "Could not connect to the ClassNotes AI backend.";
+
+            console.error("ClassNotes AI error:", error);
+            alert("AI notes failed. Make sure the ClassNotes backend is still running.");
+        }
+    }
+
+    function attachButton() {
+        const buttons = [...document.querySelectorAll("button")];
+
+        let button = buttons.find(btn => {
+            const text = btn.innerText.trim().toLowerCase();
+            return (
+                text.includes("generate notes") ||
+                text.includes("create notes") ||
+                text.includes("generate") && text.includes("note")
+            );
+        });
+
+        if (button) {
+            button.addEventListener("click", generateNotes);
+            console.log("ClassNotes AI connected to existing Generate Notes button.");
+            return true;
+        }
+
+        return false;
+    }
+
+    window.ClassNotesGenerateNotes = generateNotes;
+
+    if (!attachButton()) {
+        const observer = new MutationObserver(() => {
+            if (attachButton()) observer.disconnect();
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+})();
+</script>
+<!-- /CLASSNOTES_AI_BRIDGE -->
+
+</body>
+</html>
