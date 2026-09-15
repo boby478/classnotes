@@ -1,8 +1,9 @@
 import os
 import json
-import re
+import tempfile
 import urllib.request
 import urllib.error
+import uuid
 
 from flask import Flask, request, jsonify, send_from_directory
 
@@ -10,109 +11,185 @@ app = Flask(__name__, static_folder="../frontend", static_url_path="")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
-GEMINI_MODEL = "gemini-3.5-flash"
+TRANSCRIBE_MODEL = "gemini-3.5-transcribe"
+STUDY_MODEL = "gemini-3.8-flash"
 
 
-def call_gemini(prompt):
+def gemini_request(model, payload):
     if not GEMINI_API_KEY:
-        raise RuntimeError("GEMINI_API_KEY is not configured.")
+        raise RuntimeError("GEMINI_API_KEY is not configured on Render.")
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/"
-        f"models/{GEMINI_MODEL}:generateContent"
-        f"?key={GEMINI_API_KEY}"
+        f"models/{model}:generateContent"
     )
-
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": prompt}
-                ]
-            }
-        ],
-        "generationConfig": {
-            "temperature": 0.2,
-            "responseMimeType": "application/json"
-        }
-    }
 
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST"
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": GEMINI_API_KEY,
+        },
+        method="POST",
     )
 
-    with urllib.request.urlopen(req, timeout=120) as response:
-        result = json.loads(response.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=300) as response:
+            return json.loads(response.read().decode("utf-8"))
 
-    return result["candidates"][0]["content"]["parts"][0]["text"]
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"Gemini HTTP {e.code}: {body[:3000]}"
+        )
+
+
+def extract_text(result):
+    try:
+        return result["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception:
+        raise RuntimeError(
+            "Gemini returned an unexpected response: "
+            + json.dumps(result)[:3000]
+        )
 
 
 def parse_json(text):
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if not match:
-            raise ValueError("Gemini returned invalid JSON.")
-        return json.loads(match.group(0))
+        start = text.find("{")
+        end = text.rfind("}")
+
+        if start == -1 or end == -1:
+            raise RuntimeError("AI returned invalid JSON.")
+
+        try:
+            return json.loads(text[start:end + 1])
+        except json.JSONDecodeError:
+            raise RuntimeError("AI returned invalid JSON.")
 
 
-def split_transcript(text, chunk_words=1500):
-    words = text.split()
+def upload_audio(file_bytes, mime_type, filename):
+    boundary = "----ClassNotes" + uuid.uuid4().hex
 
-    return [
-        " ".join(words[i:i + chunk_words])
-        for i in range(0, len(words), chunk_words)
-    ]
+    metadata = json.dumps({
+        "file": {
+            "display_name": filename
+        }
+    })
+
+    body = bytearray()
+
+    body.extend(
+        (
+            f"--{boundary}\r\n"
+            "Content-Disposition: form-data; name=\"metadata\"\r\n"
+            "Content-Type: application/json; charset=UTF-8\r\n\r\n"
+            f"{metadata}\r\n"
+        ).encode()
+    )
+
+    body.extend(
+        (
+            f"--{boundary}\r\n"
+            "Content-Disposition: form-data; name=\"file\"; "
+            f"filename=\"{filename}\"\r\n"
+            f"Content-Type: {mime_type}\r\n\r\n"
+        ).encode()
+    )
+
+    body.extend(file_bytes)
+    body.extend(f"\r\n--{boundary}--\r\n".encode())
+
+    url = (
+        "https://generativelanguage.googleapis.com/upload/v1beta/files"
+        "?uploadType=multipart"
+    )
+
+    req = urllib.request.Request(
+        url,
+        data=bytes(body),
+        headers={
+            "Content-Type": f"multipart/related; boundary={boundary}",
+            "x-goog-api-key": GEMINI_API_KEY,
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=300) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"Gemini upload HTTP {e.code}: {body[:3000]}"
+        )
+
+    file_info = result.get("file", result)
+
+    uri = file_info.get("uri")
+    returned_mime = file_info.get("mimeType", mime_type)
+
+    if not uri:
+        raise RuntimeError(
+            "Gemini uploaded the audio but returned no file URI."
+        )
+
+    return uri, returned_mime
 
 
-def summarize_chunk(chunk):
+def transcribe_audio(file_bytes, mime_type, filename):
+    uri, uploaded_mime = upload_audio(
+        file_bytes,
+        mime_type,
+        filename
+    )
+
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "fileData": {
+                            "fileUri": uri,
+                            "mimeType": uploaded_mime
+                        }
+                    }
+                ]
+            }
+        ],
+        "generationConfig": {
+            "temperature": 0.1
+        }
+    }
+
+    result = gemini_request(
+        TRANSCRIBE_MODEL,
+        payload
+    )
+
+    transcript = extract_text(result).strip()
+
+    if not transcript:
+        raise RuntimeError("No speech was detected in the recording.")
+
+    return transcript
+
+
+def study_pack(text):
     prompt = f"""
 You are ClassNotes, an AI classroom study assistant.
 
-Analyze this section of a classroom transcript.
+Turn the following classroom transcript into a useful study pack.
 
-Return ONLY valid JSON:
+Use ONLY information contained in the transcript.
+Do not invent facts.
+Remove repetition and filler.
+Correct obvious speech-recognition mistakes when the intended meaning is clear.
 
-{{
-  "summary": "",
-  "key_points": [],
-  "important_terms": [],
-  "questions": [],
-  "things_to_remember": [],
-  "exam_points": []
-}}
-
-Rules:
-- Use ONLY information in the transcript.
-- Do not invent facts.
-- Remove repetition and filler.
-- Correct obvious speech-recognition errors when the meaning is clear.
-- Keep the information useful for studying.
-- Important terms should include short definitions.
-
-TRANSCRIPT SECTION:
-
-{chunk}
-"""
-
-    return parse_json(call_gemini(prompt))
-
-
-def merge_summaries(chunk_summaries):
-    combined = json.dumps(chunk_summaries, ensure_ascii=False)
-
-    prompt = f"""
-You are ClassNotes.
-
-Combine the following summaries from different sections of ONE classroom lesson.
-
-Create one complete study pack.
-
-Return ONLY valid JSON in exactly this structure:
+Return ONLY valid JSON with EXACTLY this structure:
 
 {{
   "title": "",
@@ -135,36 +212,56 @@ Return ONLY valid JSON in exactly this structure:
   ]
 }}
 
-Rules:
-- Combine duplicate information.
-- Do not invent information.
-- Preserve important details from every section.
-- Make the summary concise.
-- Make key points easy to study.
-- Give important terms short, clear definitions.
-- Make questions useful for revision.
-- Make exam points focused on information likely to matter in an assessment.
-- Create useful Q Cards covering the important material.
-- Keep answers short but accurate.
-- Return JSON only.
+Requirements:
 
-CHUNK SUMMARIES:
+- title: short lesson title
+- summary: concise but useful explanation
+- key_points: important facts and ideas
+- important_terms: important vocabulary with short definitions
+- questions: useful revision questions
+- things_to_remember: memorable facts or concepts
+- exam_points: material likely to matter in an assessment
+- q_cards: useful flashcards covering the important material
+- Keep answers accurate and reasonably short.
 
-{combined}
+TRANSCRIPT:
+
+{text}
 """
 
-    return parse_json(call_gemini(prompt))
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": prompt
+                    }
+                ]
+            }
+        ],
+        "generationConfig": {
+            "temperature": 0.2,
+            "responseMimeType": "application/json"
+        }
+    }
 
+    result = gemini_request(
+        STUDY_MODEL,
+        payload
+    )
 
-def summarize_long_transcript(text, chunk_words=1500):
-    chunks = split_transcript(text, chunk_words)
+    data = parse_json(extract_text(result))
 
-    chunk_summaries = []
+    data.setdefault("title", "Class notes")
+    data.setdefault("summary", "")
+    data.setdefault("key_points", [])
+    data.setdefault("important_terms", [])
+    data.setdefault("questions", [])
+    data.setdefault("things_to_remember", [])
+    data.setdefault("exam_points", [])
+    data.setdefault("q_cards", [])
 
-    for chunk in chunks:
-        chunk_summaries.append(summarize_chunk(chunk))
-
-    return merge_summaries(chunk_summaries)
+    return data
 
 
 @app.route("/")
@@ -177,89 +274,94 @@ def health():
     return jsonify({
         "ok": True,
         "service": "ClassNotes",
-        "ai": "online" if GEMINI_API_KEY else "not_configured"
+        "ai": "configured" if GEMINI_API_KEY else "not_configured",
+        "transcription_model": TRANSCRIBE_MODEL,
+        "study_model": STUDY_MODEL
     })
 
 
-@app.route("/summarize", methods=["POST"])
-def summarize():
-    data = request.get_json(silent=True) or {}
-    text = (data.get("text") or "").strip()
-
-    if not text:
-        return jsonify({"error": "No transcript supplied"}), 400
-
+@app.route("/transcribe", methods=["POST"])
+def transcribe():
     if not GEMINI_API_KEY:
         return jsonify({
-            "error": "AI is not configured yet."
+            "error": "GEMINI_API_KEY is not configured on Render."
         }), 503
 
+    if "audio" not in request.files:
+        return jsonify({
+            "error": "No audio file was received."
+        }), 400
+
+    audio = request.files["audio"]
+
     try:
-        # Short transcript: process normally.
-        if len(text.split()) <= 1500:
-            result = summarize_chunk(text)
+        data = audio.read()
 
-            # Turn the single chunk into the full study-pack format.
-            result = merge_summaries([result])
+        if not data:
+            return jsonify({
+                "error": "The recording was empty."
+            }), 400
 
-        # Long transcript: automatically split it.
-        else:
-            result = summarize_long_transcript(text)
+        mime_type = (
+            audio.mimetype
+            or "audio/webm"
+        )
 
-        return jsonify(result)
-
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode("utf-8", errors="replace")
+        transcript = transcribe_audio(
+            data,
+            mime_type,
+            audio.filename or "class-recording.webm"
+        )
 
         return jsonify({
-            "error": "Gemini request failed",
-            "details": error_body[:1500]
-        }), 502
+            "transcript": transcript
+        })
 
     except Exception as e:
+        print("TRANSCRIPTION ERROR:", repr(e))
+
         return jsonify({
-            "error": "AI processing failed",
+            "error": "Transcription failed.",
             "details": str(e)
-        }), 500
+        }), 502
 
 
 @app.route("/study-pack", methods=["POST"])
-def study_pack():
+def create_study_pack():
+    if not GEMINI_API_KEY:
+        return jsonify({
+            "error": "GEMINI_API_KEY is not configured on Render."
+        }), 503
+
     data = request.get_json(silent=True) or {}
     text = (data.get("text") or "").strip()
 
     if not text:
-        return jsonify({"error": "No transcript supplied"}), 400
-
-    if not GEMINI_API_KEY:
         return jsonify({
-            "error": "AI is not configured yet."
-        }), 503
+            "error": "No transcript supplied."
+        }), 400
 
     try:
-        result = summarize_long_transcript(text)
+        result = study_pack(text)
 
-        return jsonify({
-            "success": True,
-            "chunks_processed": len(split_transcript(text)),
-            "study_pack": result
-        })
-
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode("utf-8", errors="replace")
-
-        return jsonify({
-            "error": "Gemini request failed",
-            "details": error_body[:1500]
-        }), 502
+        return jsonify(result)
 
     except Exception as e:
+        print("STUDY PACK ERROR:", repr(e))
+
         return jsonify({
-            "error": "Study pack generation failed",
+            "error": "Study-pack generation failed.",
             "details": str(e)
-        }), 500
+        }), 502
+
+
+@app.route("/summarize", methods=["POST"])
+def summarize_compatibility():
+    return create_study_pack()
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 8000))
+    )
