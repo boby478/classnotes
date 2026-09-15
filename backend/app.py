@@ -160,9 +160,6 @@ def transcribe_audio(file_bytes, mime_type, filename):
                 ]
             }
         ],
-        "generationConfig": {
-            "temperature": 0.1
-        }
     }
 
     result = gemini_request(
