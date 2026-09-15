@@ -4,6 +4,8 @@ import tempfile
 import urllib.request
 import urllib.error
 import uuid
+import io
+from xml.sax.saxutils import escape as xml_escape
 
 from flask import Flask, request, jsonify, send_from_directory
 
@@ -319,7 +321,7 @@ def health():
 def transcribe():
     if not GEMINI_API_KEY:
         return jsonify({
-            "error": "LOGFARE_API_KEY is not configured on Render."
+            "error": "GEMINI_API_KEY is not configured on Render."
         }), 503
 
     if "audio" not in request.files:
@@ -393,6 +395,353 @@ def create_study_pack():
 @app.route("/summarize", methods=["POST"])
 def summarize_compatibility():
     return create_study_pack()
+
+
+
+# ============================================================
+# EXPORT FEATURES
+# ============================================================
+
+def normalise_lesson(data):
+    data = data or {}
+
+    return {
+        "title": data.get("title") or "Class Notes",
+        "date": data.get("date") or "",
+        "summary": data.get("summary") or "",
+        "transcript": data.get("transcript") or "",
+        "key_points": data.get("key_points") or [],
+        "important_terms": data.get("important_terms") or [],
+        "questions": data.get("questions") or [],
+        "things_to_remember": data.get("things_to_remember") or [],
+        "exam_points": data.get("exam_points") or [],
+        "q_cards": data.get("q_cards") or data.get("flashcards") or [],
+    }
+
+
+def lesson_text_sections(data):
+    lesson = normalise_lesson(data)
+
+    sections = []
+
+    sections.append(("Class Notes", lesson["title"]))
+    sections.append(("Date", lesson["date"]))
+    sections.append(("Summary", lesson["summary"]))
+
+    sections.append(
+        ("Key Points", lesson["key_points"])
+    )
+
+    terms = []
+    for item in lesson["important_terms"]:
+        if isinstance(item, dict):
+            terms.append(
+                f'{item.get("term", "")}: {item.get("definition", "")}'
+            )
+        else:
+            terms.append(str(item))
+
+    sections.append(("Important Terms", terms))
+    sections.append(("Study Questions", lesson["questions"]))
+    sections.append(("Things to Remember", lesson["things_to_remember"]))
+    sections.append(("Exam Points", lesson["exam_points"]))
+
+    cards = []
+    for card in lesson["q_cards"]:
+        if isinstance(card, dict):
+            q = card.get("question", card.get("q", ""))
+            a = card.get("answer", card.get("a", ""))
+            cards.append(f"Q: {q}\nA: {a}")
+        else:
+            cards.append(str(card))
+
+    sections.append(("Q Cards", cards))
+    sections.append(("Transcript", lesson["transcript"]))
+
+    return sections
+
+
+def create_docx(data):
+    from docx import Document
+    from docx.shared import Pt
+
+    lesson = normalise_lesson(data)
+
+    document = Document()
+
+    title = document.add_heading(
+        lesson["title"],
+        level=0
+    )
+
+    document.add_paragraph(
+        f'Date: {lesson["date"]}'
+    )
+
+    for heading, content in lesson_text_sections(data)[2:]:
+        document.add_heading(heading, level=1)
+
+        if isinstance(content, list):
+            for item in content:
+                paragraph = document.add_paragraph(
+                    style="List Bullet"
+                )
+                paragraph.add_run(str(item))
+        else:
+            document.add_paragraph(str(content))
+
+    for paragraph in document.paragraphs:
+        for run in paragraph.runs:
+            run.font.name = "Arial"
+            run.font.size = Pt(10.5)
+
+    output = io.BytesIO()
+    document.save(output)
+    output.seek(0)
+
+    return output
+
+
+def create_pdf(data):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (
+        SimpleDocTemplate,
+        Paragraph,
+        Spacer,
+        ListFlowable,
+        ListItem,
+        PageBreak,
+    )
+
+    lesson = normalise_lesson(data)
+
+    output = io.BytesIO()
+
+    document = SimpleDocTemplate(
+        output,
+        pagesize=A4,
+        rightMargin=18 * mm,
+        leftMargin=18 * mm,
+        topMargin=18 * mm,
+        bottomMargin=18 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+
+    title_style = styles["Title"]
+    heading_style = styles["Heading2"]
+    body_style = styles["BodyText"]
+
+    body_style.leading = 15
+
+    story = []
+
+    story.append(
+        Paragraph(
+            xml_escape(lesson["title"]),
+            title_style
+        )
+    )
+
+    story.append(
+        Paragraph(
+            "Date: " + xml_escape(lesson["date"]),
+            body_style
+        )
+    )
+
+    story.append(Spacer(1, 10))
+
+    for heading, content in lesson_text_sections(data)[2:]:
+        story.append(
+            Paragraph(
+                xml_escape(heading),
+                heading_style
+            )
+        )
+
+        if isinstance(content, list):
+            items = []
+
+            for item in content:
+                safe = xml_escape(str(item))
+                items.append(
+                    ListItem(
+                        Paragraph(safe, body_style)
+                    )
+                )
+
+            if items:
+                story.append(
+                    ListFlowable(
+                        items,
+                        bulletType="bullet",
+                        leftIndent=18,
+                    )
+                )
+
+        else:
+            story.append(
+                Paragraph(
+                    xml_escape(str(content)),
+                    body_style
+                )
+            )
+
+        story.append(Spacer(1, 8))
+
+    document.build(story)
+
+    output.seek(0)
+
+    return output
+
+
+def create_xlsx(data):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+
+    lesson = normalise_lesson(data)
+
+    workbook = Workbook()
+
+    sheet = workbook.active
+    sheet.title = "Class Notes"
+
+    sheet.append(["ClassNotes"])
+    sheet["A1"].font = Font(
+        bold=True,
+        size=18
+    )
+
+    sheet.append(["Title", lesson["title"]])
+    sheet.append(["Date", lesson["date"]])
+    sheet.append([])
+
+    rows = [
+        ("Summary", lesson["summary"]),
+    ]
+
+    for item in lesson["key_points"]:
+        rows.append(("Key Point", item))
+
+    for item in lesson["important_terms"]:
+        if isinstance(item, dict):
+            rows.append(
+                (
+                    "Important Term",
+                    f'{item.get("term", "")}: {item.get("definition", "")}'
+                )
+            )
+        else:
+            rows.append(("Important Term", str(item)))
+
+    for item in lesson["questions"]:
+        rows.append(("Study Question", item))
+
+    for item in lesson["things_to_remember"]:
+        rows.append(("Remember", item))
+
+    for item in lesson["exam_points"]:
+        rows.append(("Exam Point", item))
+
+    for card in lesson["q_cards"]:
+        if isinstance(card, dict):
+            rows.append(
+                (
+                    "Q Card",
+                    f'Q: {card.get("question", card.get("q", ""))}\n'
+                    f'A: {card.get("answer", card.get("a", ""))}'
+                )
+            )
+
+    rows.append(("Transcript", lesson["transcript"]))
+
+    for row in rows:
+        sheet.append(list(row))
+
+    sheet.column_dimensions["A"].width = 24
+    sheet.column_dimensions["B"].width = 100
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            cell.alignment = Alignment(
+                vertical="top",
+                wrap_text=True
+            )
+
+    output = io.BytesIO()
+
+    workbook.save(output)
+    output.seek(0)
+
+    return output
+
+
+@app.route("/export/<file_format>", methods=["POST"])
+def export_lesson(file_format):
+    data = request.get_json(silent=True) or {}
+
+    if not data:
+        return jsonify({
+            "error": "No lesson data supplied."
+        }), 400
+
+    file_format = file_format.lower()
+
+    try:
+        if file_format == "docx":
+            output = create_docx(data)
+            mimetype = (
+                "application/vnd.openxmlformats-officedocument."
+                "wordprocessingml.document"
+            )
+            extension = "docx"
+
+        elif file_format == "pdf":
+            output = create_pdf(data)
+            mimetype = "application/pdf"
+            extension = "pdf"
+
+        elif file_format == "xlsx":
+            output = create_xlsx(data)
+            mimetype = (
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            )
+            extension = "xlsx"
+
+        else:
+            return jsonify({
+                "error": "Unsupported export format."
+            }), 400
+
+        safe_title = "".join(
+            c if c.isalnum() or c in " _-" else "_"
+            for c in normalise_lesson(data)["title"]
+        ).strip()
+
+        if not safe_title:
+            safe_title = "ClassNotes"
+
+        from flask import send_file
+
+        return send_file(
+            output,
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=f"{safe_title}.{extension}",
+        )
+
+    except Exception as error:
+        print("EXPORT ERROR:", repr(error))
+
+        return jsonify({
+            "error": "Export failed.",
+            "details": str(error)
+        }), 500
 
 
 if __name__ == "__main__":

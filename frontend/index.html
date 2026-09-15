@@ -1252,6 +1252,137 @@ button:focus-visible,
 
 }
 
+
+/* =================================
+   CLASSNOTES EXPORT / MEMORY
+================================= */
+
+.classnotes-export-bar{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin:14px 0 20px;
+}
+
+.classnotes-export-btn,
+.classnotes-memory-btn{
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.055);
+    color:inherit;
+    border-radius:12px;
+    padding:9px 13px;
+    font-size:12px;
+    cursor:pointer;
+    transition:.15s ease;
+}
+
+.classnotes-export-btn:hover,
+.classnotes-memory-btn:hover{
+    background:rgba(255,255,255,.10);
+    transform:translateY(-1px);
+}
+
+.classnotes-export-btn:disabled{
+    opacity:.45;
+    cursor:not-allowed;
+    transform:none;
+}
+
+.classnotes-memory-box{
+    display:flex;
+    gap:8px;
+    margin:16px 0;
+}
+
+.classnotes-memory-input{
+    flex:1;
+    min-width:0;
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.045);
+    color:inherit;
+    border-radius:12px;
+    padding:11px 13px;
+    outline:none;
+}
+
+.classnotes-memory-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
+
+.classnotes-memory-card{
+    position:relative;
+    border:1px solid rgba(255,255,255,.10);
+    background:rgba(255,255,255,.035);
+    border-radius:14px;
+    padding:13px 42px 13px 14px;
+}
+
+.classnotes-memory-text{
+    line-height:1.5;
+    font-size:13px;
+}
+
+.classnotes-memory-source{
+    margin-top:5px;
+    opacity:.55;
+    font-size:10px;
+}
+
+.classnotes-memory-delete{
+    position:absolute;
+    top:10px;
+    right:10px;
+    border:0;
+    background:transparent;
+    color:inherit;
+    opacity:.5;
+    cursor:pointer;
+}
+
+.classnotes-day{
+    margin-bottom:18px;
+}
+
+.classnotes-day-heading{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:10px 4px;
+    font-weight:700;
+}
+
+.classnotes-day-date{
+    opacity:.55;
+    font-size:11px;
+    font-weight:400;
+}
+
+.classnotes-day-lessons{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
+
+@media(max-width:700px){
+
+    .classnotes-export-bar{
+        gap:6px;
+    }
+
+    .classnotes-export-btn{
+        flex:1;
+        min-width:80px;
+    }
+
+    .classnotes-memory-box{
+        flex-direction:column;
+    }
+
+}
+
 </style>
 </head>
 
@@ -1431,6 +1562,13 @@ button:focus-visible,
             Saved
         </button>
 
+        <button
+            class="tab"
+            data-tab="memory"
+        >
+            Memory
+        </button>
+
     </div>
 
 
@@ -1488,6 +1626,31 @@ button:focus-visible,
             <h2>
                 Class summary
             </h2>
+
+            <div class="classnotes-export-bar">
+
+                <button
+                    class="classnotes-export-btn"
+                    id="exportWord"
+                >
+                    Word
+                </button>
+
+                <button
+                    class="classnotes-export-btn"
+                    id="exportPDF"
+                >
+                    PDF
+                </button>
+
+                <button
+                    class="classnotes-export-btn"
+                    id="exportExcel"
+                >
+                    Excel
+                </button>
+
+            </div>
 
 
             <p id="summaryText">
@@ -1650,6 +1813,54 @@ button:focus-visible,
 
     </div>
 
+    <!-- =============================
+         MEMORY
+    ============================== -->
+
+    <div
+        class="panel"
+        id="memory"
+    >
+
+        <div class="summary">
+
+            <h2>
+                Memory
+            </h2>
+
+            <p>
+                Important things ClassNotes should remember.
+            </p>
+
+            <div class="classnotes-memory-box">
+
+                <input
+                    type="text"
+                    class="classnotes-memory-input"
+                    id="memoryInput"
+                    placeholder="Add something to remember..."
+                >
+
+                <button
+                    class="classnotes-memory-btn"
+                    id="memoryAdd"
+                >
+                    Add
+                </button>
+
+            </div>
+
+            <div
+                class="classnotes-memory-list"
+                id="memoryList"
+            ></div>
+
+        </div>
+
+    </div>
+
+
+
 
 
     <!-- =============================
@@ -1806,6 +2017,24 @@ const savedList =
 const savedEmpty =
     document.getElementById("savedEmpty");
 
+const exportWord =
+    document.getElementById("exportWord");
+
+const exportPDF =
+    document.getElementById("exportPDF");
+
+const exportExcel =
+    document.getElementById("exportExcel");
+
+const memoryInput =
+    document.getElementById("memoryInput");
+
+const memoryAdd =
+    document.getElementById("memoryAdd");
+
+const memoryList =
+    document.getElementById("memoryList");
+
 let currentFlashcards = [];
 
 let currentCardIndex = 0;
@@ -1813,6 +2042,9 @@ let currentCardIndex = 0;
 let currentLessonData = null;
 
 const SAVED_KEY = "classnotes_saved_lessons";
+
+const MEMORY_KEY =
+    "classnotes_memory";
 
 
 /* =================================
@@ -3063,11 +3295,33 @@ function saveLesson(lesson){
 
     const lessons = getSavedLessons();
 
+    const now = new Date();
+
+    lesson.dateKey =
+        lesson.dateKey ||
+        now.toISOString().slice(0,10);
+
+    lesson.date =
+        lesson.date ||
+        now.toLocaleDateString(
+            "en-GB",
+            {
+                day:"numeric",
+                month:"long",
+                year:"numeric"
+            }
+        );
+
     lessons.unshift(lesson);
 
     localStorage.setItem(
         SAVED_KEY,
         JSON.stringify(lessons)
+    );
+
+    addAutomaticMemories(
+        lesson.things_to_remember || [],
+        lesson.title || "Class"
     );
 
     renderSavedList();
@@ -3121,7 +3375,21 @@ function loadLesson(id){
 
         const li = document.createElement("li");
 
-        li.textContent = t;
+        if(typeof t === "object" && t !== null){
+
+            li.textContent =
+                (t.term || "") +
+                (
+                    t.definition
+                        ? " — " + t.definition
+                        : ""
+                );
+
+        }else{
+
+            li.textContent = t;
+
+        }
 
         terms.appendChild(li);
 
@@ -3163,7 +3431,10 @@ function loadLesson(id){
 
     });
 
-    currentFlashcards = lesson.flashcards || [];
+    currentFlashcards =
+        lesson.q_cards ||
+        lesson.flashcards ||
+        [];
 
     currentCardIndex = 0;
 
@@ -3175,21 +3446,59 @@ function loadLesson(id){
 
 }
 
+function getDayNumber(dateKey, allLessons){
+
+    const dates = [
+        ...new Set(
+            allLessons
+                .map(
+                    lesson =>
+                        lesson.dateKey ||
+                        lesson.date ||
+                        ""
+                )
+                .filter(Boolean)
+        )
+    ].sort();
+
+    const index =
+        dates.indexOf(dateKey);
+
+    return index >= 0
+        ? index + 1
+        : dates.length + 1;
+
+}
+
+
 function renderSavedList(filterText){
 
     const lessons = getSavedLessons();
 
     const filtered =
         filterText
-            ? lessons.filter(l =>
-                (l.title + " " + l.summary)
-                    .toLowerCase()
-                    .includes(filterText.toLowerCase())
-              )
+            ? lessons.filter(lesson =>
+                (
+                    (lesson.title || "") +
+                    " " +
+                    (lesson.summary || "") +
+                    " " +
+                    (lesson.date || "")
+                )
+                .toLowerCase()
+                .includes(
+                    filterText.toLowerCase()
+                )
+            )
             : lessons;
 
-    savedList.querySelectorAll(".saved-card")
-        .forEach(el => el.remove());
+    savedList
+        .querySelectorAll(
+            ".saved-card, .classnotes-day"
+        )
+        .forEach(
+            element => element.remove()
+        );
 
     if(!filtered.length){
 
@@ -3206,42 +3515,573 @@ function renderSavedList(filterText){
 
     savedEmpty.hidden = true;
 
+    const groups = {};
+
     filtered.forEach(lesson => {
 
-        const card = document.createElement("div");
+        const key =
+            lesson.dateKey ||
+            lesson.date ||
+            "unknown";
 
-        card.className = "saved-card";
+        if(!groups[key]){
+            groups[key] = [];
+        }
 
-        card.innerHTML =
-            '<button class="saved-card-delete" data-id="' +
-            lesson.id +
-            '">✕</button>' +
-            '<div class="saved-card-title">' +
-            lesson.title +
-            '</div>' +
-            '<div class="saved-card-meta">' +
-            lesson.date +
-            '</div>';
+        groups[key].push(lesson);
 
-        card.addEventListener("click", event => {
+    });
 
-            if(event.target.classList.contains("saved-card-delete")){
+    Object.keys(groups)
+        .sort()
+        .forEach(dateKey => {
 
-                deleteLesson(lesson.id);
+            const day =
+                document.createElement("div");
 
-                return;
+            day.className =
+                "classnotes-day";
 
-            }
+            const firstLesson =
+                groups[dateKey][0];
 
-            loadLesson(lesson.id);
+            const dayNumber =
+                getDayNumber(
+                    dateKey,
+                    lessons
+                );
+
+            day.innerHTML =
+                '<div class="classnotes-day-heading">' +
+                    '<span>Day ' +
+                    dayNumber +
+                    '</span>' +
+                    '<span class="classnotes-day-date">' +
+                    escapeHTML(
+                        firstLesson.date ||
+                        dateKey
+                    ) +
+                    '</span>' +
+                '</div>' +
+                '<div class="classnotes-day-lessons"></div>';
+
+            const lessonContainer =
+                day.querySelector(
+                    ".classnotes-day-lessons"
+                );
+
+            groups[dateKey].forEach(lesson => {
+
+                const card =
+                    document.createElement("div");
+
+                card.className =
+                    "saved-card";
+
+                card.innerHTML =
+                    '<button class="saved-card-delete" data-id="' +
+                    lesson.id +
+                    '">✕</button>' +
+
+                    '<div class="saved-card-title">' +
+                    escapeHTML(
+                        lesson.title ||
+                        "Class notes"
+                    ) +
+                    '</div>' +
+
+                    '<div class="saved-card-meta">' +
+                    escapeHTML(
+                        lesson.date ||
+                        ""
+                    ) +
+                    '</div>';
+
+                card.addEventListener(
+                    "click",
+                    event => {
+
+                        if(
+                            event.target.classList
+                                .contains(
+                                    "saved-card-delete"
+                                )
+                        ){
+
+                            deleteLesson(
+                                lesson.id
+                            );
+
+                            return;
+
+                        }
+
+                        loadLesson(
+                            lesson.id
+                        );
+
+                    }
+                );
+
+                lessonContainer.appendChild(
+                    card
+                );
+
+            });
+
+            savedList.appendChild(day);
 
         });
 
-        savedList.appendChild(card);
+}
+
+
+function escapeHTML(value){
+
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+}
+
+
+function getMemories(){
+
+    try{
+
+        return JSON.parse(
+            localStorage.getItem(
+                MEMORY_KEY
+            ) || "[]"
+        );
+
+    }catch(error){
+
+        return [];
+
+    }
+
+}
+
+
+function addAutomaticMemories(
+    items,
+    source
+){
+
+    if(!Array.isArray(items)){
+        return;
+    }
+
+    const memories =
+        getMemories();
+
+    items.forEach(item => {
+
+        let text = "";
+
+        if(
+            typeof item === "object" &&
+            item !== null
+        ){
+
+            text =
+                item.text ||
+                item.fact ||
+                item.point ||
+                item.remember ||
+                "";
+
+        }else{
+
+            text = String(item);
+
+        }
+
+        text = text.trim();
+
+        if(!text){
+            return;
+        }
+
+        const exists =
+            memories.some(
+                memory =>
+                    (
+                        memory.text || ""
+                    ).toLowerCase() ===
+                    text.toLowerCase()
+            );
+
+        if(exists){
+            return;
+        }
+
+        memories.unshift({
+
+            id:
+                Date.now() +
+                Math.random(),
+
+            text,
+
+            source:
+                source || "Class",
+
+            date:
+                new Date().toLocaleDateString(
+                    "en-GB",
+                    {
+                        day:"numeric",
+                        month:"long",
+                        year:"numeric"
+                    }
+                )
+
+        });
+
+    });
+
+    localStorage.setItem(
+        MEMORY_KEY,
+        JSON.stringify(memories)
+    );
+
+    renderMemory();
+
+}
+
+
+function addManualMemory(){
+
+    const text =
+        memoryInput.value.trim();
+
+    if(!text){
+        return;
+    }
+
+    addAutomaticMemories(
+        [text],
+        "Manual memory"
+    );
+
+    memoryInput.value = "";
+
+}
+
+
+function deleteMemory(id){
+
+    const memories =
+        getMemories().filter(
+            memory =>
+                String(memory.id) !==
+                String(id)
+        );
+
+    localStorage.setItem(
+        MEMORY_KEY,
+        JSON.stringify(memories)
+    );
+
+    renderMemory();
+
+}
+
+
+function renderMemory(){
+
+    memoryList.innerHTML = "";
+
+    const memories =
+        getMemories();
+
+    if(!memories.length){
+
+        memoryList.innerHTML =
+            '<div class="saved-empty">' +
+            'Nothing in memory yet.' +
+            '</div>';
+
+        return;
+
+    }
+
+    memories.forEach(memory => {
+
+        const card =
+            document.createElement("div");
+
+        card.className =
+            "classnotes-memory-card";
+
+        card.innerHTML =
+            '<button class="classnotes-memory-delete">' +
+            '✕' +
+            '</button>' +
+
+            '<div class="classnotes-memory-text">' +
+            escapeHTML(
+                memory.text
+            ) +
+            '</div>' +
+
+            '<div class="classnotes-memory-source">' +
+            "From " +
+            escapeHTML(
+                memory.source ||
+                "Class"
+            ) +
+            " • " +
+            escapeHTML(
+                memory.date ||
+                ""
+            ) +
+            '</div>';
+
+        card.querySelector(
+            ".classnotes-memory-delete"
+        ).addEventListener(
+            "click",
+            () =>
+                deleteMemory(
+                    memory.id
+                )
+        );
+
+        memoryList.appendChild(
+            card
+        );
 
     });
 
 }
+
+
+function exportCurrentLesson(format){
+
+    if(!currentLessonData){
+
+        alert(
+            "Generate or open a saved lesson first."
+        );
+
+        return;
+
+    }
+
+    const buttons = {
+
+        docx: exportWord,
+
+        pdf: exportPDF,
+
+        xlsx: exportExcel
+
+    };
+
+    const button =
+        buttons[format];
+
+    if(button){
+
+        button.disabled = true;
+
+        button.textContent =
+            "Preparing…";
+
+    }
+
+    fetch(
+        BACKEND +
+        "/export/" +
+        format,
+        {
+
+            method:"POST",
+
+            headers:{
+                "Content-Type":
+                    "application/json"
+            },
+
+            body:
+                JSON.stringify(
+                    currentLessonData
+                )
+
+        }
+    )
+    .then(response => {
+
+        if(!response.ok){
+
+            return response
+                .json()
+                .catch(
+                    () => ({})
+                )
+                .then(error => {
+
+                    throw new Error(
+                        error.details ||
+                        error.error ||
+                        "Export failed."
+                    );
+
+                });
+
+        }
+
+        return response.blob();
+
+    })
+    .then(blob => {
+
+        const url =
+            URL.createObjectURL(
+                blob
+            );
+
+        const link =
+            document.createElement("a");
+
+        link.href = url;
+
+        const extension =
+            format === "docx"
+                ? "docx"
+                : format === "pdf"
+                    ? "pdf"
+                    : "xlsx";
+
+        link.download =
+            (
+                currentLessonData.title ||
+                "ClassNotes"
+            )
+            .replace(
+                /[^\w\s-]/g,
+                "_"
+            )
+            .trim() +
+            "." +
+            extension;
+
+        document.body.appendChild(
+            link
+        );
+
+        link.click();
+
+        link.remove();
+
+        URL.revokeObjectURL(
+            url
+        );
+
+    })
+    .catch(error => {
+
+        console.error(
+            "Export error:",
+            error
+        );
+
+        alert(
+            "Couldn't export the lesson: " +
+            error.message
+        );
+
+    })
+    .finally(() => {
+
+        if(button){
+
+            button.disabled = false;
+
+            button.textContent =
+                format === "docx"
+                    ? "Word"
+                    : format === "pdf"
+                        ? "PDF"
+                        : "Excel";
+
+        }
+
+    });
+
+}
+
+
+if(exportWord){
+
+    exportWord.addEventListener(
+        "click",
+        () =>
+            exportCurrentLesson(
+                "docx"
+            )
+    );
+
+}
+
+if(exportPDF){
+
+    exportPDF.addEventListener(
+        "click",
+        () =>
+            exportCurrentLesson(
+                "pdf"
+            )
+    );
+
+}
+
+if(exportExcel){
+
+    exportExcel.addEventListener(
+        "click",
+        () =>
+            exportCurrentLesson(
+                "xlsx"
+            )
+    );
+
+}
+
+if(memoryAdd){
+
+    memoryAdd.addEventListener(
+        "click",
+        addManualMemory
+    );
+
+}
+
+if(memoryInput){
+
+    memoryInput.addEventListener(
+        "keydown",
+        event => {
+
+            if(event.key === "Enter"){
+
+                addManualMemory();
+
+            }
+
+        }
+    );
+
+}
+
+renderMemory();
+
 
 searchInput.addEventListener(
     "input",
