@@ -1918,6 +1918,12 @@ const BACKEND =
 
 let recognition = null;
 
+let internalAudioRecording = false;
+let internalAudioRecorder = null;
+let internalAudioStream = null;
+let internalAudioChunks = [];
+let micClickTimer = null;
+
 let listening = false;
 
 let processing = false;
@@ -2575,29 +2581,353 @@ micButton.addEventListener(
     "click",
     () => {
 
-        if(!recognition){
-
-            alert(
-                "Speech recognition is not supported. Try Chrome."
-            );
-
-            return;
-
+        if(micClickTimer){
+            clearTimeout(micClickTimer);
         }
 
+        micClickTimer = setTimeout(
+            () => {
 
-        if(listening){
+                micClickTimer = null;
 
-            stopListening();
+                if(internalAudioRecording)
+                    return;
+
+                if(!recognition){
+
+                    alert(
+                        "Speech recognition is not supported. Try Chrome."
+                    );
+
+                    return;
+                }
+
+                if(listening){
+
+                    stopListening();
+
+                }else{
+
+                    startListening();
+
+                }
+
+            },
+            280
+        );
+
+    }
+);
+
+micButton.addEventListener(
+    "dblclick",
+    event => {
+
+        event.preventDefault();
+
+        if(micClickTimer){
+
+            clearTimeout(
+                micClickTimer
+            );
+
+            micClickTimer = null;
+        }
+
+        if(internalAudioRecording){
+
+            stopInternalAudio();
 
         }else{
 
-            startListening();
+            if(listening){
+
+                try{
+                    recognition.stop();
+                }catch(error){}
+
+            }
+
+            startInternalAudio();
 
         }
 
     }
 );
+
+
+
+async function startInternalAudio(){
+
+    if(internalAudioRecording) return;
+
+    if(
+        !navigator.mediaDevices ||
+        !navigator.mediaDevices.getDisplayMedia
+    ){
+        alert("Internal audio capture is not supported by this browser.");
+        return;
+    }
+
+    try{
+
+        const displayStream =
+            await navigator.mediaDevices.getDisplayMedia({
+                video:true,
+                audio:true
+            });
+
+        const audioTracks =
+            displayStream.getAudioTracks();
+
+        if(!audioTracks.length){
+
+            displayStream
+                .getTracks()
+                .forEach(track => track.stop());
+
+            throw new Error(
+                "No audio was shared. Select a tab and enable Share audio."
+            );
+        }
+
+        internalAudioRecording = true;
+        internalAudioChunks = [];
+
+        internalAudioStream =
+            new MediaStream(audioTracks);
+
+        const mimeTypes = [
+            "audio/webm;codecs=opus",
+            "audio/webm",
+            "audio/ogg;codecs=opus"
+        ];
+
+        let mimeType = "";
+
+        for(const type of mimeTypes){
+
+            if(
+                MediaRecorder.isTypeSupported &&
+                MediaRecorder.isTypeSupported(type)
+            ){
+                mimeType = type;
+                break;
+            }
+        }
+
+        internalAudioRecorder =
+            mimeType
+            ? new MediaRecorder(
+                internalAudioStream,
+                {mimeType}
+              )
+            : new MediaRecorder(
+                internalAudioStream
+              );
+
+        listening = true;
+
+        micButton.classList.add("listening");
+
+        micLabel.textContent = "Internal audio";
+        micSub.textContent = "Recording browser audio…";
+
+        internalAudioRecorder.ondataavailable =
+            event => {
+
+                if(
+                    event.data &&
+                    event.data.size
+                ){
+                    internalAudioChunks.push(
+                        event.data
+                    );
+                }
+
+            };
+
+        internalAudioRecorder.onstop =
+            async () => {
+
+                const blob =
+                    new Blob(
+                        internalAudioChunks,
+                        {
+                            type:
+                                mimeType ||
+                                "audio/webm"
+                        }
+                    );
+
+                internalAudioChunks = [];
+
+                if(internalAudioStream){
+
+                    internalAudioStream
+                        .getTracks()
+                        .forEach(
+                            track => track.stop()
+                        );
+
+                }
+
+                internalAudioStream = null;
+                internalAudioRecorder = null;
+                internalAudioRecording = false;
+                listening = false;
+
+                micButton.classList.remove("listening");
+
+                micLabel.textContent = "Transcribing…";
+                micSub.textContent = "Converting class audio to text";
+
+                try{
+
+                    const form =
+                        new FormData();
+
+                    form.append(
+                        "audio",
+                        blob,
+                        "internal-audio.webm"
+                    );
+
+                    const response =
+                        await fetch(
+                            BACKEND + "/transcribe",
+                            {
+                                method:"POST",
+                                body:form
+                            }
+                        );
+
+                    const raw =
+                        await response.text();
+
+                    if(!response.ok){
+
+                        throw new Error(
+                            "Transcription failed (" +
+                            response.status +
+                            "): " +
+                            raw
+                        );
+
+                    }
+
+                    const data =
+                        JSON.parse(raw);
+
+                    const transcript =
+                        String(
+                            data.transcript || ""
+                        ).trim();
+
+                    if(!transcript){
+
+                        throw new Error(
+                            "No speech was detected."
+                        );
+
+                    }
+
+                    finalTranscript = transcript;
+                    interimTranscript = "";
+
+                    if(
+                        typeof cnShowTranscript ===
+                        "function"
+                    ){
+                        cnShowTranscript(
+                            transcript
+                        );
+                    }
+
+                    processing = false;
+
+                    micLabel.textContent =
+                        "Generate notes";
+
+                    micSub.textContent =
+                        "Audio transcribed successfully";
+
+                }catch(error){
+
+                    console.error(
+                        "Internal audio error:",
+                        error
+                    );
+
+                    processing = false;
+
+                    micLabel.textContent =
+                        "Start listening";
+
+                    micSub.textContent =
+                        error.message;
+
+                }
+
+            };
+
+        const videoTrack =
+            displayStream.getVideoTracks()[0];
+
+        if(videoTrack){
+
+            videoTrack.onended =
+                () => {
+
+                    if(
+                        internalAudioRecorder &&
+                        internalAudioRecorder.state ===
+                        "recording"
+                    ){
+                        internalAudioRecorder.stop();
+                    }
+
+                };
+
+        }
+
+        internalAudioRecorder.start();
+
+    }catch(error){
+
+        internalAudioRecording = false;
+        listening = false;
+
+        micButton.classList.remove("listening");
+
+        micLabel.textContent =
+            "Start listening";
+
+        micSub.textContent =
+            error.message ||
+            "Internal audio capture cancelled.";
+
+        console.error(
+            "Internal audio capture:",
+            error
+        );
+    }
+}
+
+
+function stopInternalAudio(){
+
+    if(
+        internalAudioRecorder &&
+        internalAudioRecorder.state ===
+        "recording"
+    ){
+
+        internalAudioRecorder.stop();
+
+    }
+
+}
 
 
 function startListening(){
@@ -2633,6 +2963,11 @@ function startListening(){
 
 
 function stopListening(){
+
+    if(internalAudioRecording){
+        stopInternalAudio();
+        return;
+    }
 
     listening = false;
 
