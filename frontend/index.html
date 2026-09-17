@@ -2657,12 +2657,16 @@ micButton.addEventListener(
 
 
 
+
 let internalAudioUploadQueue = Promise.resolve();
 let internalAudioTimer = null;
-let internalAudioStartedAt = 0;
+let internalAudioRecorder = null;
+let internalAudioStream = null;
+let internalAudioRecording = false;
 let internalAudioStopping = false;
-let internalAudioAudioContext = null;
-let internalAudioKeepAlive = null;
+let internalAudioStartedAt = 0;
+let internalAudioChunkNumber = 0;
+
 
 async function startInternalAudio(){
 
@@ -2673,9 +2677,11 @@ async function startInternalAudio(){
         !navigator.mediaDevices ||
         !navigator.mediaDevices.getDisplayMedia
     ){
+
         alert(
-            "Internal audio capture is not supported. Use desktop Chrome or Edge."
+            "Your browser does not support internal audio capture. Use Chrome or Edge on your laptop."
         );
+
         return;
     }
 
@@ -2683,115 +2689,111 @@ async function startInternalAudio(){
 
     try{
 
-        const options = {
-            video: true,
+        /*
+         * IMPORTANT:
+         * The user must choose the Teams/YouTube tab,
+         * window or screen AND enable Share audio.
+         */
+        const stream =
+            await navigator.mediaDevices.getDisplayMedia({
 
-            audio: {
-                suppressLocalAudioPlayback: false
-            },
+                video:true,
 
-            systemAudio: "include",
-            windowAudio: "system",
+                audio:true,
 
-            selfBrowserSurface: "exclude",
-            surfaceSwitching: "include",
-            monitorTypeSurfaces: "include",
+                systemAudio:"include",
 
-            preferCurrentTab: false
-        };
+                surfaceSwitching:"include",
 
-        const displayStream =
-            await navigator.mediaDevices.getDisplayMedia(
-                options
-            );
+                selfBrowserSurface:"exclude",
 
-        const videoTracks =
-            displayStream.getVideoTracks();
+                preferCurrentTab:false
+
+            });
+
 
         const audioTracks =
-            displayStream.getAudioTracks();
+            stream.getAudioTracks();
+
 
         if(!audioTracks.length){
 
-            displayStream
+            stream
                 .getTracks()
                 .forEach(track => track.stop());
 
             throw new Error(
-                "No audio was shared. Select your Teams tab/window/screen and turn ON Share audio."
+                "NO AUDIO TRACK. Select the Teams/YouTube tab or window and turn ON 'Share audio'."
             );
         }
 
-        /*
-         * Keep the captured audio audible to the user.
-         *
-         * Some capture modes can otherwise stop routing
-         * captured tab audio to the speakers.
-         */
-        try{
-
-            internalAudioAudioContext =
-                new AudioContext();
-
-            const source =
-                internalAudioAudioContext
-                    .createMediaStreamSource(
-                        new MediaStream(audioTracks)
-                    );
-
-            source.connect(
-                internalAudioAudioContext.destination
-            );
-
-            if(
-                internalAudioAudioContext.state ===
-                "suspended"
-            ){
-
-                await internalAudioAudioContext.resume();
-
-            }
-
-            internalAudioKeepAlive = source;
-
-        }catch(audioError){
-
-            console.warn(
-                "Could not create local audio monitor:",
-                audioError
-            );
-
-        }
 
         /*
-         * We only need the audio tracks for transcription.
-         * The video track exists because getDisplayMedia()
-         * requires it.
+         * Keep only audio.
+         * The video track is not needed for transcription.
          */
-        videoTracks.forEach(
-            track => track.stop()
-        );
+        stream
+            .getVideoTracks()
+            .forEach(track => track.stop());
+
 
         internalAudioStream =
             new MediaStream(audioTracks);
 
+
         internalAudioRecording = true;
-        internalAudioStartedAt =
-            Date.now();
+        internalAudioStopping = false;
+        internalAudioStartedAt = Date.now();
+        internalAudioChunkNumber = 0;
 
-        listening = true;
 
-        micButton.classList.add("listening");
+        finalTranscript = "";
+        interimTranscript = "";
+
+
+        micButton
+            .classList
+            .add("listening");
+
+
+        if(
+            typeof statusDot !== "undefined" &&
+            statusDot
+        ){
+
+            statusDot
+                .classList
+                .remove("processing");
+
+            statusDot
+                .classList
+                .add("listening");
+
+        }
+
+
+        if(
+            typeof statusText !== "undefined" &&
+            statusText
+        ){
+
+            statusText.textContent =
+                "Internal audio active";
+
+        }
+
 
         micLabel.textContent =
-            "Internal audio";
+            "Listening to class audio";
+
 
         micSub.textContent =
-            "Listening to class audio…";
+            "Teams/YouTube audio is being captured";
+
 
         /*
-         * If the user clicks Chrome's "Stop sharing",
-         * immediately stop our recorder too.
+         * If the browser stops the shared audio track,
+         * stop the internal recorder cleanly.
          */
         audioTracks.forEach(track => {
 
@@ -2799,32 +2801,27 @@ async function startInternalAudio(){
                 "ended",
                 () => {
 
-                    if(
-                        internalAudioRecording &&
-                        !internalAudioStopping
-                    ){
+                    if(internalAudioRecording){
 
                         stopInternalAudio();
 
                     }
 
-                }
+                },
+                { once:true }
             );
 
         });
 
+
         /*
-         * Begin the first COMPLETE recording.
-         *
-         * We intentionally stop and restart the recorder
-         * every 15 seconds. Each resulting Blob is a
-         * complete WebM file with its own header, so the
-         * server receives independently decodable audio.
+         * Start the first complete recording.
          */
         startInternalAudioChunk();
 
+
         /*
-         * Hard two-hour safety limit.
+         * Safety limit: 2 hours.
          */
         internalAudioTimer =
             setTimeout(
@@ -2840,6 +2837,13 @@ async function startInternalAudio(){
                 2 * 60 * 60 * 1000
             );
 
+
+        console.log(
+            "CLASSNOTES INTERNAL AUDIO: audio track detected",
+            audioTracks[0].label
+        );
+
+
     }catch(error){
 
         console.error(
@@ -2847,24 +2851,48 @@ async function startInternalAudio(){
             error
         );
 
-        internalAudioRecording = false;
-        listening = false;
 
-        micButton.classList.remove(
-            "listening"
-        );
+        internalAudioRecording = false;
+
+
+        if(
+            typeof statusText !== "undefined" &&
+            statusText
+        ){
+
+            statusText.textContent =
+                "Audio capture failed";
+
+        }
+
 
         micLabel.textContent =
-            "Microphone";
+            "Audio capture failed";
+
 
         micSub.textContent =
-            "Tap to speak";
-
-        alert(
             error.message ||
-            "Could not start internal audio."
-        );
+            "No audio was captured";
+
+
+        micButton
+            .classList
+            .remove("listening");
+
+
+        if(
+            typeof statusDot !== "undefined" &&
+            statusDot
+        ){
+
+            statusDot
+                .classList
+                .remove("listening");
+
+        }
+
     }
+
 }
 
 
@@ -2872,6 +2900,7 @@ function startInternalAudioChunk(){
 
     if(
         !internalAudioRecording ||
+        internalAudioStopping ||
         !internalAudioStream
     ){
 
@@ -2879,74 +2908,62 @@ function startInternalAudioChunk(){
 
     }
 
+
+    const stream =
+        internalAudioStream;
+
+
+    let mimeType =
+        "audio/webm;codecs=opus";
+
+
     if(
-        Date.now() -
-        internalAudioStartedAt
-        >=
-        2 * 60 * 60 * 1000
+        !MediaRecorder.isTypeSupported(
+            mimeType
+        )
     ){
 
+        mimeType =
+            "audio/webm";
+
+    }
+
+
+    if(
+        !MediaRecorder.isTypeSupported(
+            mimeType
+        )
+    ){
+
+        micLabel.textContent =
+            "Recorder unsupported";
+
+        micSub.textContent =
+            "Chrome cannot create an audio recording";
+
         stopInternalAudio();
+
         return;
 
     }
 
-    const mimeTypes = [
-        "audio/webm;codecs=opus",
-        "audio/webm"
-    ];
 
-    let mimeType = "";
-
-    for(
-        const type of mimeTypes
-    ){
-
-        if(
-            MediaRecorder.isTypeSupported &&
-            MediaRecorder.isTypeSupported(type)
-        ){
-
-            mimeType = type;
-            break;
-
-        }
-
-    }
-
-    let recorder;
-
-    try{
-
-        recorder =
-            mimeType
-                ? new MediaRecorder(
-                    internalAudioStream,
-                    {
-                        mimeType: mimeType,
-                        audioBitsPerSecond: 128000
-                    }
-                )
-                : new MediaRecorder(
-                    internalAudioStream
-                );
-
-    }catch(error){
-
-        console.error(
-            "MediaRecorder creation failed:",
-            error
+    const recorder =
+        new MediaRecorder(
+            stream,
+            {
+                mimeType:mimeType,
+                audioBitsPerSecond:128000
+            }
         );
 
-        stopInternalAudio();
-        return;
-
-    }
 
     internalAudioRecorder =
         recorder;
 
+
     const chunks = [];
+
 
     recorder.ondataavailable =
         event => {
@@ -2964,15 +2981,17 @@ function startInternalAudioChunk(){
 
         };
 
+
     recorder.onerror =
         event => {
 
             console.error(
-                "Internal recorder error:",
-                event
+                "MediaRecorder error:",
+                event.error
             );
 
         };
+
 
     recorder.onstop =
         () => {
@@ -2981,41 +3000,50 @@ function startInternalAudioChunk(){
                 new Blob(
                     chunks,
                     {
-                        type:
-                            mimeType ||
-                            "audio/webm"
+                        type:mimeType
                     }
                 );
 
-            /*
-             * Queue uploads so Gemini requests never
-             * pile up on top of one another.
-             */
-            if(blob.size > 0){
+
+            internalAudioChunkNumber++;
+
+
+            console.log(
+                "CLASSNOTES AUDIO CHUNK",
+                internalAudioChunkNumber,
+                blob.size,
+                blob.type
+            );
+
+
+            if(blob.size < 1000){
+
+                console.warn(
+                    "Audio chunk is suspiciously small."
+                );
+
+            }else{
 
                 internalAudioUploadQueue =
                     internalAudioUploadQueue
                         .then(
                             () =>
                                 transcribeInternalChunk(
-                                    blob
+                                    blob,
+                                    internalAudioChunkNumber
                                 )
                         )
                         .catch(
                             error =>
                                 console.error(
-                                    "Internal chunk error:",
+                                    "Audio queue error:",
                                     error
                                 )
                         );
 
             }
 
-            /*
-             * Immediately start the next complete
-             * recording while the previous chunk is
-             * being uploaded.
-             */
+
             if(
                 internalAudioRecording &&
                 !internalAudioStopping
@@ -3027,19 +3055,37 @@ function startInternalAudioChunk(){
 
         };
 
-    recorder.start();
+
+    try{
+
+        recorder.start();
+
+        console.log(
+            "CLASSNOTES: recording audio chunk"
+        );
+
+
+    }catch(error){
+
+        console.error(
+            "Could not start MediaRecorder:",
+            error
+        );
+
+        stopInternalAudio();
+
+        return;
+
+    }
+
 
     /*
-     * Fifteen seconds gives Gemini much smaller,
-     * independently valid files and keeps the transcript
-     * flowing during the class.
+     * 20-second COMPLETE audio file.
      */
     setTimeout(
         () => {
 
             if(
-                recorder ===
-                internalAudioRecorder &&
                 recorder.state ===
                 "recording"
             ){
@@ -3051,7 +3097,7 @@ function startInternalAudioChunk(){
                 }catch(error){
 
                     console.error(
-                        "Chunk stop failed:",
+                        "Could not stop audio chunk:",
                         error
                     );
 
@@ -3060,13 +3106,15 @@ function startInternalAudioChunk(){
             }
 
         },
-        15000
+        20000
     );
+
 }
 
 
 async function transcribeInternalChunk(
-    blob
+    blob,
+    chunkNumber
 ){
 
     if(
@@ -3078,10 +3126,25 @@ async function transcribeInternalChunk(
 
     }
 
+
+    if(
+        typeof statusText !==
+        "undefined" &&
+        statusText
+    ){
+
+        statusText.textContent =
+            "Transcribing audio chunk " +
+            chunkNumber;
+
+    }
+
+
     try{
 
         const form =
             new FormData();
+
 
         form.append(
             "audio",
@@ -3089,30 +3152,59 @@ async function transcribeInternalChunk(
             "class-audio.webm"
         );
 
+
         const response =
             await fetch(
                 BACKEND + "/transcribe",
                 {
-                    method: "POST",
-                    body: form
+                    method:"POST",
+                    body:form
                 }
             );
+
 
         const raw =
             await response.text();
 
+
+        console.log(
+            "CLASSNOTES TRANSCRIBE RESPONSE",
+            chunkNumber,
+            response.status,
+            raw
+        );
+
+
         if(!response.ok){
 
+            let message =
+                raw;
+
+            try{
+
+                const errorData =
+                    JSON.parse(raw);
+
+                message =
+                    errorData.details ||
+                    errorData.error ||
+                    raw;
+
+            }catch(error){}
+
+
             throw new Error(
-                "Transcription failed (" +
-                response.status +
-                "): " +
-                raw
+                "Chunk " +
+                chunkNumber +
+                " failed: " +
+                message
             );
 
         }
 
+
         let data;
+
 
         try{
 
@@ -3128,27 +3220,36 @@ async function transcribeInternalChunk(
 
         }
 
+
         const transcript =
             String(
                 data.transcript ||
                 ""
             ).trim();
 
-        if(!transcript)
+
+        if(!transcript){
+
+            console.warn(
+                "Gemini returned no speech for chunk",
+                chunkNumber
+            );
+
             return;
 
-        /*
-         * Never replace previous class audio.
-         * Every successful chunk is appended.
-         */
+        }
+
+
         if(
             typeof finalTranscript !==
             "string"
         ){
 
-            finalTranscript = "";
+            finalTranscript =
+                "";
 
         }
+
 
         finalTranscript =
             finalTranscript
@@ -3157,7 +3258,10 @@ async function transcribeInternalChunk(
                   transcript
                 : transcript;
 
-        interimTranscript = "";
+
+        interimTranscript =
+            "";
+
 
         if(
             typeof cnShowTranscript ===
@@ -3170,6 +3274,7 @@ async function transcribeInternalChunk(
 
         }
 
+
         if(
             typeof transcriptText !==
             "undefined" &&
@@ -3181,18 +3286,102 @@ async function transcribeInternalChunk(
 
         }
 
+
+        micLabel.textContent =
+            "Listening to class audio";
+
+
+        micSub.textContent =
+            "Transcript updated";
+
+
+        if(
+            typeof statusText !==
+            "undefined" &&
+            statusText
+        ){
+
+            statusText.textContent =
+                "Internal audio active";
+
+        }
+
+
+        console.log(
+            "CLASSNOTES TRANSCRIPT:",
+            transcript
+        );
+
+
     }catch(error){
 
-        /*
-         * One failed 15-second chunk must NOT
-         * kill the two-hour capture.
-         */
         console.error(
             "Internal audio transcription failed:",
             error
         );
 
+
+        /*
+         * SHOW THE REAL ERROR.
+         */
+        micLabel.textContent =
+            "Audio transcription error";
+
+
+        micSub.textContent =
+            error.message ||
+            "Could not transcribe audio";
+
+
+        if(
+            typeof statusText !==
+            "undefined" &&
+            statusText
+        ){
+
+            statusText.textContent =
+                "Transcription error";
+
+        }
+
+
+        /*
+         * Recording continues.
+         * The next chunk will still be attempted.
+         */
+        setTimeout(
+            () => {
+
+                if(
+                    internalAudioRecording &&
+                    !internalAudioStopping
+                ){
+
+                    micLabel.textContent =
+                        "Listening to class audio";
+
+                    micSub.textContent =
+                        "Capturing the next audio chunk";
+
+                    if(
+                        typeof statusText !==
+                        "undefined" &&
+                        statusText
+                    ){
+
+                        statusText.textContent =
+                            "Internal audio active";
+
+                    }
+
+                }
+
+            },
+            3000
+        );
+
     }
+
 }
 
 
@@ -3201,69 +3390,126 @@ function stopInternalAudio(){
     if(internalAudioStopping)
         return;
 
-    internalAudioStopping = true;
-    internalAudioRecording = false;
-    listening = false;
+
+    internalAudioStopping =
+        true;
+
+
+    internalAudioRecording =
+        false;
+
+
+    listening =
+        false;
+
 
     if(internalAudioTimer){
-        clearTimeout(internalAudioTimer);
-        internalAudioTimer = null;
+
+        clearTimeout(
+            internalAudioTimer
+        );
+
+        internalAudioTimer =
+            null;
+
     }
+
 
     if(
         internalAudioRecorder &&
-        internalAudioRecorder.state === "recording"
+        internalAudioRecorder.state ===
+        "recording"
     ){
+
         try{
+
             internalAudioRecorder.stop();
+
         }catch(error){
+
             console.error(
-                "Internal recorder stop failed:",
+                "Recorder stop error:",
                 error
             );
+
         }
+
     }
+
 
     if(internalAudioStream){
+
         internalAudioStream
             .getTracks()
-            .forEach(track => {
-                try{
-                    track.stop();
-                }catch(error){}
-            });
+            .forEach(
+                track => {
 
-        internalAudioStream = null;
+                    try{
+
+                        track.stop();
+
+                    }catch(error){}
+
+                }
+            );
+
+
+        internalAudioStream =
+            null;
+
     }
 
-    if(internalAudioAudioContext){
-        try{
-            internalAudioAudioContext.close();
-        }catch(error){}
 
-        internalAudioAudioContext = null;
-        internalAudioKeepAlive = null;
-    }
+    internalAudioRecorder =
+        null;
 
-    internalAudioRecorder = null;
-    internalAudioChunks = [];
 
-    micButton.classList.remove("listening");
+    micButton
+        .classList
+        .remove("listening");
+
 
     if(
-        typeof statusDot !== "undefined" &&
+        typeof statusDot !==
+        "undefined" &&
         statusDot
     ){
-        statusDot.classList.remove("listening");
-        statusDot.classList.remove("processing");
+
+        statusDot
+            .classList
+            .remove("listening");
+
+        statusDot
+            .classList
+            .remove("processing");
+
     }
 
-    micLabel.textContent = "Microphone";
-    micSub.textContent = "Tap to speak";
 
-    internalAudioStopping = false;
+    micLabel.textContent =
+        "Microphone";
+
+
+    micSub.textContent =
+        "Tap to speak";
+
+
+    if(
+        typeof statusText !==
+        "undefined" &&
+        statusText
+    ){
+
+        statusText.textContent =
+            "Ready";
+
+    }
+
+
+    internalAudioStopping =
+        false;
+
 }
-
 
 function startListening(){
 
