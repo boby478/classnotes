@@ -2674,11 +2674,15 @@ async function startInternalAudio(){
         const displayStream =
             await navigator.mediaDevices.getDisplayMedia({
                 video:true,
-                audio:true
+                audio:true,
+                systemAudio:"include",
+                windowAudio:"system",
+                selfBrowserSurface:"exclude",
+                surfaceSwitching:"include",
+                monitorTypeSurfaces:"include"
             });
 
-        const audioTracks =
-            displayStream.getAudioTracks();
+        const audioTracks = displayStream.getAudioTracks();
 
         if(!audioTracks.length){
 
@@ -2687,7 +2691,7 @@ async function startInternalAudio(){
                 .forEach(track => track.stop());
 
             throw new Error(
-                "No audio was shared. Select a tab and enable Share audio."
+                "No audio was shared. Select your Teams/browser tab or window and enable Share audio."
             );
         }
 
@@ -2718,20 +2722,19 @@ async function startInternalAudio(){
 
         internalAudioRecorder =
             mimeType
-            ? new MediaRecorder(
-                internalAudioStream,
-                {mimeType}
-              )
-            : new MediaRecorder(
-                internalAudioStream
-              );
+                ? new MediaRecorder(
+                    internalAudioStream,
+                    {mimeType}
+                  )
+                : new MediaRecorder(
+                    internalAudioStream
+                  );
 
         listening = true;
-
         micButton.classList.add("listening");
 
         micLabel.textContent = "Internal audio";
-        micSub.textContent = "Recording browser audio…";
+        micSub.textContent = "Listening to class audio…";
 
         internalAudioRecorder.ondataavailable =
             event => {
@@ -2740,177 +2743,188 @@ async function startInternalAudio(){
                     event.data &&
                     event.data.size
                 ){
-                    internalAudioChunks.push(
-                        event.data
+
+                    const chunk = event.data;
+
+                    internalAudioChunks.push(chunk);
+
+                    transcribeInternalChunk(
+                        chunk,
+                        mimeType || "audio/webm"
                     );
+                }
+            };
+
+        internalAudioRecorder.onerror =
+            event => {
+
+                console.error(
+                    "Internal audio recorder error:",
+                    event
+                );
+            };
+
+        audioTracks.forEach(track => {
+
+            track.onended = () => {
+
+                if(internalAudioRecording){
+                    stopInternalAudio();
                 }
 
             };
 
-        internalAudioRecorder.onstop =
-            async () => {
+        });
 
-                const blob =
-                    new Blob(
-                        internalAudioChunks,
-                        {
-                            type:
-                                mimeType ||
-                                "audio/webm"
-                        }
-                    );
+        /*
+         * IMPORTANT:
+         * Generate one audio chunk every 60 seconds.
+         * This means a 2-hour class is never uploaded
+         * as one giant file.
+         */
+        internalAudioRecorder.start(60000);
 
-                internalAudioChunks = [];
-
-                if(internalAudioStream){
-
-                    internalAudioStream
-                        .getTracks()
-                        .forEach(
-                            track => track.stop()
-                        );
-
-                }
-
-                internalAudioStream = null;
-                internalAudioRecorder = null;
-                internalAudioRecording = false;
-                listening = false;
-
-                micButton.classList.remove("listening");
-
-                micLabel.textContent = "Transcribing…";
-                micSub.textContent = "Converting class audio to text";
-
-                try{
-
-                    const form =
-                        new FormData();
-
-                    form.append(
-                        "audio",
-                        blob,
-                        "internal-audio.webm"
-                    );
-
-                    const response =
-                        await fetch(
-                            BACKEND + "/transcribe",
-                            {
-                                method:"POST",
-                                body:form
-                            }
-                        );
-
-                    const raw =
-                        await response.text();
-
-                    if(!response.ok){
-
-                        throw new Error(
-                            "Transcription failed (" +
-                            response.status +
-                            "): " +
-                            raw
-                        );
-
-                    }
-
-                    const data =
-                        JSON.parse(raw);
-
-                    const transcript =
-                        String(
-                            data.transcript || ""
-                        ).trim();
-
-                    if(!transcript){
-
-                        throw new Error(
-                            "No speech was detected."
-                        );
-
-                    }
-
-                    finalTranscript = transcript;
-                    interimTranscript = "";
-
-                    if(
-                        typeof cnShowTranscript ===
-                        "function"
-                    ){
-                        cnShowTranscript(
-                            transcript
-                        );
-                    }
-
-                    processing = false;
-
-                    micLabel.textContent =
-                        "Generate notes";
-
-                    micSub.textContent =
-                        "Audio transcribed successfully";
-
-                }catch(error){
-
-                    console.error(
-                        "Internal audio error:",
-                        error
-                    );
-
-                    processing = false;
-
-                    micLabel.textContent =
-                        "Start listening";
-
-                    micSub.textContent =
-                        error.message;
-
-                }
-
-            };
-
-        const videoTrack =
-            displayStream.getVideoTracks()[0];
-
-        if(videoTrack){
-
-            videoTrack.onended =
+        /*
+         * Safety limit: approximately 2 hours.
+         */
+        window.internalAudioTimeout =
+            setTimeout(
                 () => {
-
-                    if(
-                        internalAudioRecorder &&
-                        internalAudioRecorder.state ===
-                        "recording"
-                    ){
-                        internalAudioRecorder.stop();
+                    if(internalAudioRecording){
+                        stopInternalAudio();
                     }
-
-                };
-
-        }
-
-        internalAudioRecorder.start();
+                },
+                2 * 60 * 60 * 1000
+            );
 
     }catch(error){
+
+        console.error(
+            "Internal audio error:",
+            error
+        );
 
         internalAudioRecording = false;
         listening = false;
 
         micButton.classList.remove("listening");
 
-        micLabel.textContent =
-            "Start listening";
+        micLabel.textContent = "Microphone";
+        micSub.textContent = "Tap to speak";
 
-        micSub.textContent =
+        alert(
             error.message ||
-            "Internal audio capture cancelled.";
+            "Could not start internal audio capture."
+        );
+    }
+}
+
+
+async function transcribeInternalChunk(
+    blob,
+    mimeType
+){
+
+    if(!blob || !blob.size)
+        return;
+
+    try{
+
+        const form =
+            new FormData();
+
+        let extension = "webm";
+
+        if(
+            mimeType &&
+            mimeType.includes("ogg")
+        ){
+            extension = "ogg";
+        }
+
+        form.append(
+            "audio",
+            blob,
+            "class-chunk." + extension
+        );
+
+        const response =
+            await fetch(
+                BACKEND + "/transcribe",
+                {
+                    method:"POST",
+                    body:form
+                }
+            );
+
+        const raw =
+            await response.text();
+
+        if(!response.ok){
+
+            throw new Error(
+                "Transcription failed (" +
+                response.status +
+                "): " +
+                raw
+            );
+        }
+
+        const data =
+            JSON.parse(raw);
+
+        const transcript =
+            String(
+                data.transcript || ""
+            ).trim();
+
+        if(!transcript)
+            return;
+
+        /*
+         * Append each 60-second result instead of
+         * replacing the previous class transcript.
+         */
+        if(
+            typeof finalTranscript !== "string"
+        ){
+            finalTranscript = "";
+        }
+
+        finalTranscript =
+            finalTranscript
+                ? finalTranscript + " " + transcript
+                : transcript;
+
+        interimTranscript = "";
+
+        if(
+            typeof cnShowTranscript === "function"
+        ){
+
+            cnShowTranscript(
+                finalTranscript
+            );
+
+        }
+
+        if(
+            typeof transcriptText !== "undefined" &&
+            transcriptText
+        ){
+
+            transcriptText.scrollTop =
+                transcriptText.scrollHeight;
+
+        }
+
+    }catch(error){
 
         console.error(
-            "Internal audio capture:",
+            "Internal audio chunk transcription error:",
             error
         );
+
     }
 }
 
