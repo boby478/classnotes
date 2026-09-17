@@ -144,6 +144,7 @@ def upload_audio(file_bytes, mime_type, filename):
 
 
 def transcribe_audio(file_bytes, mime_type, filename):
+
     uri, uploaded_mime = upload_audio(
         file_bytes,
         mime_type,
@@ -154,6 +155,30 @@ def transcribe_audio(file_bytes, mime_type, filename):
         "contents": [
             {
                 "parts": [
+                    {
+                        "text": """
+Transcribe the audio recording VERBATIM.
+
+This is a classroom recording.
+
+IMPORTANT:
+- Transcribe ALL audible spoken words.
+- Do NOT summarize.
+- Do NOT shorten the recording.
+- Do NOT omit sentences or words.
+- Preserve the speaker's actual wording.
+- Preserve repetitions when they are spoken.
+- Preserve natural filler words such as "um", "uh", "okay", etc. when audible.
+- Do not turn the recording into notes.
+- Do not explain anything.
+- Do not add information that was not spoken.
+- Do not invent missing words.
+- If the speaker is speaking isiZulu/Zulu, transcribe the isiZulu words exactly as spoken.
+- If the speaker switches between English and isiZulu, preserve both languages.
+- Use punctuation where the speech clearly indicates it.
+- Return ONLY the transcript.
+"""
+                    },
                     {
                         "fileData": {
                             "fileUri": uri,
@@ -173,7 +198,9 @@ def transcribe_audio(file_bytes, mime_type, filename):
     transcript = extract_text(result).strip()
 
     if not transcript:
-        raise RuntimeError("No speech was detected in the recording.")
+        raise RuntimeError(
+            "No speech was detected in the recording."
+        )
 
     return transcript
 
